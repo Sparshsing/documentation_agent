@@ -1,4 +1,7 @@
 .ipynb_checkpoints/
 __pycache__/
+.mypy_cache/
+data/
+logs/
 *.md
 *.json

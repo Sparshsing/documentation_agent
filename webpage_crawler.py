@@ -14,10 +14,14 @@ async def get_markdown(url: str) -> str:
 if __name__ == "__main__":
     import sys
     
-    if len(sys.argv) != 2:
-        print("Usage: python script.py <url>")
+    if len(sys.argv) != 3:
+        print("Usage: python script.py <url> <output_file>")
         sys.exit(1)
     
     url = sys.argv[1]
+    output_file = sys.argv[2]
+    
     markdown = asyncio.run(get_markdown(url))
-    print(markdown)
+    with open(output_file, 'w', encoding='utf-8') as f:
+        f.write(markdown)
+

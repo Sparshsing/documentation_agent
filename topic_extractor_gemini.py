@@ -1,5 +1,6 @@
 from dotenv import load_dotenv
 import asyncio
+import os
 import json
 from typing import List, Optional
 from pydantic import BaseModel, Field
@@ -12,20 +13,22 @@ load_dotenv()
 
 MODEL = "gemini-2.0-flash-exp"
 
+genai.configure(api_key=os.environ['GEMINI_API_KEY'])
+
 
 # Topic model definition
 class Topic(BaseModel):
-    title: str = Field(..., description="The title of the topic")
-    url: Optional[str] = Field(None, description="The URL of the topic")
-    supertopic: Optional[str] = Field(None, description="The parent topic")
+    title: str = Field(description="The title of the topic")
+    url: Optional[str] = Field(description="The URL of the topic")
+    supertopic: Optional[str] = Field(description="The parent topic")
 
 
 # Output model for the list of topics
 class TopicList(BaseModel):
-    topics: List[Topic] = Field(..., description="List of documentation topics extracted from the text")
+    topics: List[Topic] = Field(description="List of documentation topics extracted from the text")
 
 
-def extract_topics(url: str) -> List[Topic]:
+async def extract_topics(url: str) -> List[Topic]:
     """
     Extract topics from the given documentation webpage using Gemini (schema in model config).
     
@@ -37,7 +40,7 @@ def extract_topics(url: str) -> List[Topic]:
     """
 
     # get webpage content
-    webpage_content = asyncio.run(get_markdown(url))
+    webpage_content = await get_markdown(url)
 
     model = genai.GenerativeModel(MODEL)
 
@@ -55,7 +58,7 @@ def extract_topics(url: str) -> List[Topic]:
             max_output_tokens=8000,
             temperature=0.1,
             response_mime_type="application/json",
-            response_schema=TopicList
+            response_schema=TopicList.model_json_schema(),
         ),
     )
 
@@ -63,7 +66,7 @@ def extract_topics(url: str) -> List[Topic]:
     return result.topics
 
 
-def extract_topics_with_prompt(url: str) -> List[Topic]:
+async def extract_topics(url: str) -> List[Topic]:
     """
     Extract topics from the given documentation webpage url using Gemini (schema in prompt).
     
@@ -75,7 +78,7 @@ def extract_topics_with_prompt(url: str) -> List[Topic]:
     """
 
     # get webpage content
-    webpage_content = asyncio.run(get_markdown(url))
+    webpage_content = await get_markdown(url)
 
     model = genai.GenerativeModel(MODEL)
 

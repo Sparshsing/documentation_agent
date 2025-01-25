@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 from langchain_groq import ChatGroq
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import ChatPromptTemplate
+from langchain.globals import set_verbose
 
 from webpage_crawler import get_markdown
 
@@ -16,18 +17,18 @@ MODEL = "llama-3.3-70b-versatile"
 
 # Topic model definition
 class Topic(BaseModel):
-    title: str = Field(..., description="The title of the topic")
-    url: Optional[str] = Field(None, description="The URL of the topic")
-    supertopic: Optional[str] = Field(None, description="The parent topic")
+    title: str = Field(description="The title of the topic")
+    url: Optional[str] = Field(description="The URL of the topic")
+    supertopic: Optional[str] = Field(description="The parent topic")
 
 
 # Output model for the list of topics
 class TopicList(BaseModel):
-    topics: List[Topic] = Field(..., description="List of documentation topics extracted from the text")
+    topics: List[Topic] = Field(description="List of documentation topics extracted from the text")
 
 
 
-def extract_topics(url: str) -> List[Topic]:
+async def extract_topics(url: str) -> List[Topic]:
     """
     Extract topics from the given documentation webpage url using LangChain.
     
@@ -38,6 +39,8 @@ def extract_topics(url: str) -> List[Topic]:
         List[Topic]: A list of extracted topics
     """
 
+    set_verbose(True)
+    
     # Initialize the parser
     parser = PydanticOutputParser(pydantic_object=TopicList)
 
@@ -61,7 +64,7 @@ def extract_topics(url: str) -> List[Topic]:
     )
 
     # get webpage content
-    webpage_content = asyncio.run(get_markdown(url))
+    webpage_content = await get_markdown(url)
 
     # Initialize the language model
     llm = ChatGroq(temperature=0, model_name=MODEL, max_tokens=8000)
@@ -71,15 +74,15 @@ def extract_topics(url: str) -> List[Topic]:
 
     result = chain.invoke({'webpage_content': webpage_content})
     
+    set_verbose(False)
+    
     return result.topics
 
 
 # Example usage
 if __name__ == "__main__":
-    
-    
     try:
-        topics = extract_topics(webpage_content)
+        topics = asyncio.run(extract_topics("https://docs.crawl4ai.com)/"))
         for topic in topics:
             print(f"Title: {topic.title}")
             print(f"URL: {topic.url}")
