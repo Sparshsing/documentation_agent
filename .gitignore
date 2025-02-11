@@ -1,7 +1,14 @@
 .ipynb_checkpoints/
 __pycache__/
 .mypy_cache/
+*.code-workspace
 data/
 logs/
+temp_files/
 *.md
 *.json
+.aider*
+.env
+*.bin
+*.sqlite3
+*.pickle
