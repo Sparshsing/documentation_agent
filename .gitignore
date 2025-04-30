@@ -12,3 +12,4 @@ temp_files/
 *.bin
 *.sqlite3
 *.pickle
+*.log
