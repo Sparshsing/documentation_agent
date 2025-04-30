@@ -2,6 +2,8 @@
 
 import os
 import typing
+import time
+import logging
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -11,9 +13,13 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Tuple,
     Type,
     Union,
 )
+import asyncio
+from datetime import datetime, timedelta
+import threading
 
 import llama_index.core.instrumentation as instrument
 from llama_index.core.base.llms.generic_utils import (
@@ -56,6 +62,8 @@ import google.genai.types as types
 dispatcher = instrument.get_dispatcher(__name__)
 
 DEFAULT_MODEL = "gemini-2.0-flash"
+DEAFULT_RPM_LIMIT = 10
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from llama_index.core.tools.types import BaseTool
@@ -65,6 +73,11 @@ class VertexAIConfig(typing.TypedDict):
     credentials: Optional[google.auth.credentials.Credentials] = None
     project: Optional[str] = None
     location: Optional[str] = None
+
+
+class RateLimitExceeded(Exception):
+    """Exception raised when rate limit is exceeded."""
+    pass
 
 
 class CustomGoogleGenAI(FunctionCallingLLM):
@@ -102,6 +115,14 @@ class CustomGoogleGenAI(FunctionCallingLLM):
     _client: google.genai.Client = PrivateAttr()
     _generation_config: types.GenerateContentConfigDict = PrivateAttr()
     _model_meta: types.Model = PrivateAttr()
+    _rate_limits: Dict[str, int] = PrivateAttr()
+    _token_limits: Dict[str, int] = PrivateAttr()
+    _request_timestamps: Dict[str, List[float]] = PrivateAttr()
+    _token_usage: Dict[str, List[Tuple[float, int]]] = PrivateAttr()
+    _rate_limit_semaphore: asyncio.Semaphore = PrivateAttr()
+    _sync_rate_limit_semaphore: threading.Semaphore = PrivateAttr()
+    _timestamp_lock: asyncio.Lock = PrivateAttr()
+    _sync_timestamp_lock: threading.Lock = PrivateAttr()
 
     def __init__(
         self,
@@ -180,6 +201,118 @@ class CustomGoogleGenAI(FunctionCallingLLM):
         self._max_tokens = (
             max_tokens or model_meta.output_token_limit or DEFAULT_NUM_OUTPUTS
         )
+        
+        # Initialize rate limiting parameters
+        self._rate_limits = {
+            "gemini-2.5-pro-preview-03-25": 5,  # requests per minute
+            "gemini-2.5-flash-preview-04-17": 10,
+            "gemini-2.0-flash": 15,
+            'gemma-3-27b-it': 5
+        }
+        self._token_limits = {
+            "gemini-2.5-pro-preview-03-25": 250000,  # tokens per minute
+            "gemini-2.5-flash-preview-04-17": 250000,
+            "gemini-2.0-flash": 1000000,
+            'gemma-3-27b-it': 15000
+        }
+        self._request_timestamps = {model: [] for model in self._rate_limits}
+        self._token_usage = {model: [] for model in self._rate_limits}
+        # Initialize Semaphores based on RPM limit
+        rpm_limit = self._rate_limits.get(model, DEAFULT_RPM_LIMIT) # Default if model not specified
+        self._rate_limit_semaphore = asyncio.Semaphore(rpm_limit)
+        self._sync_rate_limit_semaphore = threading.Semaphore(rpm_limit)
+        # Initialize locks
+        self._timestamp_lock = asyncio.Lock()
+        self._sync_timestamp_lock = threading.Lock()
+
+    def _check_and_update_rate_limit_window(self, model: str, estimated_tokens: int) -> Tuple[bool, float, str]:
+        """Checks RPM/TPM limits and updates timestamps if possible.
+        
+        This method assumes the caller holds the appropriate lock (_timestamp_lock or _sync_timestamp_lock).
+        
+        Returns:
+            Tuple[bool, float, str]: (proceed, sleep_time, log_message)
+        """
+        current_time = time.time()
+        # --- Clean up old timestamps --- 
+        self._request_timestamps[model] = [
+            ts for ts in self._request_timestamps[model]
+            if current_time - ts < 60
+        ]
+        self._token_usage[model] = [
+            (ts, tkn) for ts, tkn in self._token_usage[model]
+            if current_time - ts < 60
+        ]
+
+        # --- Check Limits --- 
+        rpm_limit = self._rate_limits.get(model, DEAFULT_RPM_LIMIT)
+        request_limit_hit = len(self._request_timestamps[model]) >= rpm_limit
+
+        token_limit = self._token_limits.get(model)
+        token_limit_hit = False
+        total_recent_tokens = 0
+        if token_limit is not None:
+            total_recent_tokens = sum(tkn for _, tkn in self._token_usage[model])
+            token_limit_hit = total_recent_tokens + estimated_tokens >= token_limit
+        
+        # --- Decide Action --- 
+        if not request_limit_hit and not token_limit_hit:
+            # Limits OK, record request timestamp
+            self._request_timestamps[model].append(time.time())
+            logger.debug(f"Rate limit window check passed for {model}.", )
+            return True, 0.0, ""
+        else:
+            # Limit Hit: Calculate required sleep time
+            sleep_time = 1.1 # Min sleep if limit hit but no timestamps
+            log_msg = ""
+
+            if request_limit_hit:
+                oldest_req_ts = min(self._request_timestamps[model])
+                sleep_time_req = max(0, 60 - (current_time - oldest_req_ts)) + 1.1
+                sleep_time = max(sleep_time, sleep_time_req)
+                log_msg += f" Request limit hit (count: {len(self._request_timestamps[model])}/{rpm_limit}, oldest: {current_time - oldest_req_ts:.1f}s ago)."
+            
+            if token_limit_hit:
+                if self._token_usage[model]:
+                    oldest_token_ts = min(ts for ts, _ in self._token_usage[model])
+                    sleep_time_token = max(0, 60 - (current_time - oldest_token_ts)) + 1.1
+                    sleep_time = max(sleep_time, sleep_time_token)
+                    log_msg += f" Token limit hit (current: {total_recent_tokens}, needs: {estimated_tokens}, limit: {token_limit}, oldest: {current_time - oldest_token_ts:.1f}s ago)."
+                elif token_limit is not None and estimated_tokens >= token_limit:
+                    log_msg += f" Single request tokens ({estimated_tokens}) exceed limit ({token_limit})."
+                    sleep_time = max(sleep_time, 1.1)
+            
+            return False, sleep_time, log_msg
+
+    async def _wait_for_rate_limit_window(self, model: str, estimated_tokens: int) -> None:
+        """Waits if necessary to comply with RPM and TPM rolling windows, using a lock.
+        """
+        while True:
+            async with self._timestamp_lock:
+                proceed, sleep_time, log_msg = self._check_and_update_rate_limit_window(model, estimated_tokens)
+            if proceed:
+                break # Exit the wait loop
+            else:
+                logger.debug(f"[ASYNC] Rate limit window requires waiting {sleep_time:.2f}s for {model}.{log_msg}")
+                await asyncio.sleep(sleep_time)
+                # Loop continues to re-acquire lock and re-check after sleep
+
+    def _wait_for_rate_limit_window_sync(self, model: str, estimated_tokens: int) -> None:
+        """Synchronous version of waiting for rate limit window, using a lock."""
+        while True:
+            with self._sync_timestamp_lock:
+                proceed, sleep_time, log_msg = self._check_and_update_rate_limit_window(model, estimated_tokens)
+
+            if proceed:
+                break
+            else:
+                logger.debug(f"[SYNC] Rate limit window requires waiting {sleep_time:.2f}s for {model}.{log_msg}")
+                time.sleep(sleep_time)
+
+    def _record_token_usage(self, model: str, tokens_used: int) -> None:
+        """Record token usage for a request."""
+        current_time = time.time()
+        self._token_usage[model].append((current_time, tokens_used))
 
     @classmethod
     def class_name(cls) -> str:
@@ -231,29 +364,67 @@ class CustomGoogleGenAI(FunctionCallingLLM):
 
     @llm_chat_callback()
     def chat(self, messages: Sequence[ChatMessage], **kwargs: Any) -> ChatResponse:
-        generation_config = {
-            **(self._generation_config or {}),
-            **kwargs.pop("generation_config", {}),
-        }
-        params = {**kwargs, "generation_config": generation_config}
-        next_msg, chat_kwargs = prepare_chat_params(self.model, messages, **params)
-        chat = self._client.chats.create(**chat_kwargs)
-        response = chat.send_message(next_msg.parts)
-        return chat_from_gemini_response(response)
+        # Estimate token usage
+        estimated_tokens = sum(len(msg.content.split()) * 1.3 for msg in messages if msg.content)
+        estimated_tokens = int(estimated_tokens)
+        
+        # Acquire semaphore - this blocks if concurrency limit is reached
+        self._sync_rate_limit_semaphore.acquire()
+        try:
+            # Wait for time window if necessary
+            self._wait_for_rate_limit_window_sync(self.model, estimated_tokens)
+            
+            # Proceed with the request
+            generation_config = {
+                **(self._generation_config or {}),
+                **kwargs.pop("generation_config", {}),
+            }
+            params = {**kwargs, "generation_config": generation_config}
+            next_msg, chat_kwargs = prepare_chat_params(self.model, messages, **params)
+            print('Sending SYNC Gemini request', str(messages[0].content)[:15], datetime.now().strftime("%H:%M:%S.%f"))
+            chat = self._client.chats.create(**chat_kwargs)
+            response = chat.send_message(next_msg.parts)
+
+            # Record actual token usage
+            actual_tokens = estimated_tokens + len(response.text.split()) * 1.3
+            if response.usage_metadata:
+                actual_tokens = response.usage_metadata.total_token_count
+            self._record_token_usage(self.model, int(actual_tokens))
+            return chat_from_gemini_response(response)
+        finally:
+            # Ensure semaphore is always released
+            self._sync_rate_limit_semaphore.release()
 
     @llm_chat_callback()
-    async def achat(
-        self, messages: Sequence[ChatMessage], **kwargs: Any
-    ) -> ChatResponse:
-        generation_config = {
-            **(self._generation_config or {}),
-            **kwargs.pop("generation_config", {}),
-        }
-        params = {**kwargs, "generation_config": generation_config}
-        next_msg, chat_kwargs = prepare_chat_params(self.model, messages, **params)
-        chat = self._client.aio.chats.create(**chat_kwargs)
-        response = await chat.send_message(next_msg.parts)
-        return chat_from_gemini_response(response)
+    async def achat(self, messages: Sequence[ChatMessage], **kwargs: Any) -> ChatResponse:
+        # Estimate token usage
+        estimated_tokens = sum(len(msg.content.split()) * 1.3 for msg in messages if msg.content)
+        estimated_tokens = int(estimated_tokens)
+
+        # Acquire semaphore - this awaits if concurrency limit is reached
+        async with self._rate_limit_semaphore:
+            # Wait for time window if necessary (acquires lock internally)
+            await self._wait_for_rate_limit_window(self.model, estimated_tokens)
+
+            # Proceed with the request (Semaphore still held)
+            generation_config = {
+                **(self._generation_config or {}),
+                **kwargs.pop("generation_config", {}),
+            }
+            params = {**kwargs, "generation_config": generation_config}
+            next_msg, chat_kwargs = prepare_chat_params(self.model, messages, **params)
+            print('Sending ASYNC Gemini request', str(messages[0].content)[:15],datetime.now().strftime("%H:%M:%S.%f"))
+            chat = self._client.aio.chats.create(**chat_kwargs)
+            response = await chat.send_message(next_msg.parts)
+
+            # Record token usage
+            actual_tokens = estimated_tokens + len(response.text.split()) * 1.3
+            if response.usage_metadata:
+                actual_tokens = response.usage_metadata.total_token_count
+            self._record_token_usage(self.model, int(actual_tokens))
+            
+            return chat_from_gemini_response(response)
+        # Semaphore is automatically released by 'async with'
 
     @llm_chat_callback()
     def stream_chat(
