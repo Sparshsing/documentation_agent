@@ -58,12 +58,16 @@ import google.genai
 import google.auth
 import google.genai.types as types
 
-
 dispatcher = instrument.get_dispatcher(__name__)
 
 DEFAULT_MODEL = "gemini-2.0-flash"
 DEAFULT_RPM_LIMIT = 10
 logger = logging.getLogger(__name__)
+
+# Retry constants
+DEFAULT_MAX_RETRIES = 3
+RETRY_DELAY_RATE_LIMIT_SEC = 60
+RETRY_DELAY_OTHER_SEC = 3
 
 if TYPE_CHECKING:
     from llama_index.core.tools.types import BaseTool
@@ -123,6 +127,7 @@ class CustomGoogleGenAI(FunctionCallingLLM):
     _sync_rate_limit_semaphore: threading.Semaphore = PrivateAttr()
     _timestamp_lock: asyncio.Lock = PrivateAttr()
     _sync_timestamp_lock: threading.Lock = PrivateAttr()
+    _max_retries: int = PrivateAttr()
 
     def __init__(
         self,
@@ -137,6 +142,7 @@ class CustomGoogleGenAI(FunctionCallingLLM):
         generation_config: Optional[types.GenerateContentConfig] = None,
         callback_manager: Optional[CallbackManager] = None,
         is_function_calling_model: bool = True,
+        max_retries: int = DEFAULT_MAX_RETRIES,
         **kwargs: Any,
     ):
         # API keys are optional. The API can be authorised via OAuth (detected
@@ -185,6 +191,7 @@ class CustomGoogleGenAI(FunctionCallingLLM):
             **kwargs,
         )
 
+        self._max_retries = max_retries
         self.model = model
         self._client = client
         self._model_meta = model_meta
@@ -207,12 +214,14 @@ class CustomGoogleGenAI(FunctionCallingLLM):
             "gemini-2.5-pro-preview-03-25": 5,  # requests per minute
             "gemini-2.5-flash-preview-04-17": 10,
             "gemini-2.0-flash": 15,
+            "gemini-2.0-flash-lite": 30,
             'gemma-3-27b-it': 5
         }
         self._token_limits = {
             "gemini-2.5-pro-preview-03-25": 250000,  # tokens per minute
             "gemini-2.5-flash-preview-04-17": 250000,
             "gemini-2.0-flash": 1000000,
+            "gemini-2.0-flash-lite": 1000000,
             'gemma-3-27b-it': 15000
         }
         self._request_timestamps = {model: [] for model in self._rate_limits}
@@ -368,29 +377,62 @@ class CustomGoogleGenAI(FunctionCallingLLM):
         estimated_tokens = sum(len(msg.content.split()) * 1.3 for msg in messages if msg.content)
         estimated_tokens = int(estimated_tokens)
         
-        # Acquire semaphore - this blocks if concurrency limit is reached
         self._sync_rate_limit_semaphore.acquire()
         try:
             # Wait for time window if necessary
             self._wait_for_rate_limit_window_sync(self.model, estimated_tokens)
             
-            # Proceed with the request
             generation_config = {
                 **(self._generation_config or {}),
                 **kwargs.pop("generation_config", {}),
             }
             params = {**kwargs, "generation_config": generation_config}
             next_msg, chat_kwargs = prepare_chat_params(self.model, messages, **params)
-            print('Sending SYNC Gemini request', str(messages[0].content)[:15], datetime.now().strftime("%H:%M:%S.%f"))
-            chat = self._client.chats.create(**chat_kwargs)
-            response = chat.send_message(next_msg.parts)
+            
+            retries = 0
+            last_exception = None
+            while retries < self._max_retries:
+                try:
+                    # print('Sending SYNC Gemini request', str(messages[0].content)[:15], datetime.now().strftime("%H:%M:%S.%f"))
+                    chat = self._client.chats.create(**chat_kwargs)
+                    response = chat.send_message(next_msg.parts)
 
-            # Record actual token usage
-            actual_tokens = estimated_tokens + len(response.text.split()) * 1.3
-            if response.usage_metadata:
-                actual_tokens = response.usage_metadata.total_token_count
-            self._record_token_usage(self.model, int(actual_tokens))
-            return chat_from_gemini_response(response)
+                    # Record actual token usage
+                    actual_tokens = estimated_tokens # Start with estimated
+                    if response.text: # Add response tokens if available
+                        actual_tokens += len(response.text.split()) * 1.3
+                    if response.usage_metadata and response.usage_metadata.total_token_count is not None:
+                        actual_tokens = response.usage_metadata.total_token_count
+                    else:
+                        # If no usage_metadata, refine based on prompt and candidate tokens if possible
+                        prompt_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
+                        candidate_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
+                        if prompt_tokens > 0 or candidate_tokens > 0: # use if available
+                             actual_tokens = prompt_tokens + candidate_tokens
+                    self._record_token_usage(self.model, int(actual_tokens))
+                    return chat_from_gemini_response(response)
+                except google.genai.errors.ClientError as e:
+                    if not(e.code == 429 or '429' in str(e)):
+                        raise e
+                    last_exception = e
+                    retries += 1
+                    logger.warning(
+                        f"Rate limit exceeded for model {self.model} during chat. "
+                        f"Retrying ({retries}/{self._max_retries}) after {RETRY_DELAY_RATE_LIMIT_SEC}s. Error: {e}"
+                    )
+                    time.sleep(RETRY_DELAY_RATE_LIMIT_SEC)
+                except Exception as e:
+                    last_exception = e
+                    retries += 1
+                    logger.warning(
+                        f"Error during chat API call for model {self.model}. "
+                        f"Retrying ({retries}/{self._max_retries}) after {RETRY_DELAY_OTHER_SEC}s. Error: {e}"
+                    )
+                    time.sleep(RETRY_DELAY_OTHER_SEC)
+            
+            logger.error(f"Max retries ({self._max_retries}) reached for chat with model {self.model}. Last error: {last_exception}")
+            raise last_exception # type: ignore
+
         finally:
             # Ensure semaphore is always released
             self._sync_rate_limit_semaphore.release()
@@ -401,29 +443,61 @@ class CustomGoogleGenAI(FunctionCallingLLM):
         estimated_tokens = sum(len(msg.content.split()) * 1.3 for msg in messages if msg.content)
         estimated_tokens = int(estimated_tokens)
 
-        # Acquire semaphore - this awaits if concurrency limit is reached
         async with self._rate_limit_semaphore:
             # Wait for time window if necessary (acquires lock internally)
             await self._wait_for_rate_limit_window(self.model, estimated_tokens)
 
-            # Proceed with the request (Semaphore still held)
             generation_config = {
                 **(self._generation_config or {}),
                 **kwargs.pop("generation_config", {}),
             }
             params = {**kwargs, "generation_config": generation_config}
             next_msg, chat_kwargs = prepare_chat_params(self.model, messages, **params)
-            print('Sending ASYNC Gemini request', str(messages[0].content)[:15],datetime.now().strftime("%H:%M:%S.%f"))
-            chat = self._client.aio.chats.create(**chat_kwargs)
-            response = await chat.send_message(next_msg.parts)
 
-            # Record token usage
-            actual_tokens = estimated_tokens + len(response.text.split()) * 1.3
-            if response.usage_metadata:
-                actual_tokens = response.usage_metadata.total_token_count
-            self._record_token_usage(self.model, int(actual_tokens))
+            retries = 0
+            last_exception = None
+            while retries < self._max_retries:
+                try:
+                    # print('Sending ASYNC Gemini request', str(messages[0].content)[:15],datetime.now().strftime("%H:%M:%S.%f"))
+                    chat = self._client.aio.chats.create(**chat_kwargs)
+                    response = await chat.send_message(next_msg.parts)
+
+                    # Record token usage
+                    actual_tokens = estimated_tokens # Start with estimated
+                    if response.text: # Add response tokens if available
+                        actual_tokens += len(response.text.split()) * 1.3
+                    if response.usage_metadata and response.usage_metadata.total_token_count is not None:
+                        actual_tokens = response.usage_metadata.total_token_count
+                    else:
+                        # If no usage_metadata, refine based on prompt and candidate tokens if possible
+                        prompt_tokens = response.usage_metadata.prompt_token_count if response.usage_metadata else 0
+                        candidate_tokens = response.usage_metadata.candidates_token_count if response.usage_metadata else 0
+                        if prompt_tokens > 0 or candidate_tokens > 0: # use if available
+                             actual_tokens = prompt_tokens + candidate_tokens
+                    self._record_token_usage(self.model, int(actual_tokens))
+                    
+                    return chat_from_gemini_response(response)
+                except google.genai.errors.ClientError as e:
+                    if not(e.code == 429 or '429' in str(e)):
+                        raise e
+                    last_exception = e
+                    retries += 1
+                    logger.warning(
+                        f"[ASYNC] Rate limit exceeded for model {self.model} during achat. "
+                        f"Retrying ({retries}/{self._max_retries}) after {RETRY_DELAY_RATE_LIMIT_SEC}s. Error: {e}"
+                    )
+                    await asyncio.sleep(RETRY_DELAY_RATE_LIMIT_SEC)
+                except Exception as e:
+                    last_exception = e
+                    retries += 1
+                    logger.warning(
+                        f"[ASYNC] Error during achat API call for model {self.model}. "
+                        f"Retrying ({retries}/{self._max_retries}) after {RETRY_DELAY_OTHER_SEC}s. Error: {e}"
+                    )
+                    await asyncio.sleep(RETRY_DELAY_OTHER_SEC)
             
-            return chat_from_gemini_response(response)
+            logger.error(f"[ASYNC] Max retries ({self._max_retries}) reached for achat with model {self.model}. Last error: {last_exception}")
+            raise last_exception # type: ignore
         # Semaphore is automatically released by 'async with'
 
     @llm_chat_callback()
