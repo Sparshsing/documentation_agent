@@ -2,10 +2,8 @@ import os
 import asyncio
 import json
 from typing import List, Optional
-from urllib.parse import urljoin
 
 from pydantic import BaseModel, Field
-from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
 from google import genai
@@ -16,14 +14,12 @@ from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import ChatPromptTemplate
 from langchain.globals import set_verbose
 
-from webpage_crawler import get_cleaned_html
+from webpage_crawler import get_cleaned_html, replace_relative_urls
 
 
 load_dotenv()
 
-LITELLM_MODEL = "gemini/gemini-2.5-flash-preview-05-20"
-# LITELLM_MODEL = "together_ai/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
-
+LITELLM_MODEL = "together_ai/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
 
 GEMINI_MODEL = "gemini-2.5-flash-preview-05-20"
 GEMINI_API_KEY = os.environ['GEMINI_API_KEY']
@@ -40,14 +36,6 @@ class Topic(BaseModel):
 
 class TopicList(BaseModel):
     topics: List[Topic] = Field(description="List of documentation topics extracted from the text")
-
-
-def replace_relative_urls(html_content, base_url):
-    """Function to replace relative URLs with absolute URLs"""
-    soup = BeautifulSoup(html_content, 'html.parser')
-    for tag in soup.find_all(href=True):
-        tag['href'] = urljoin(base_url, tag['href'])
-    return str(soup)
 
 
 def extract_topics(webpage_content: str) -> List[Topic]:

@@ -1,4 +1,3 @@
-
 import logging
 import os
 import time
@@ -16,13 +15,8 @@ import nbconvert
 from nbconvert import PythonExporter, MarkdownExporter
 import asyncio
 from llama_index.core.ingestion import IngestionPipeline
-from vertexai.preview import tokenization
 
-
-
-
-logger = logging.getLogger(__name__)
-
+logger = logging.getLogger('documentation_agent.utlities')
 
 # custom logger
 def create_custom_logger(logger_name, logfile_path):

@@ -1,6 +1,8 @@
 import asyncio
 from crawl4ai import AsyncWebCrawler
 from crawl4ai.cache_context import CacheMode
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 
 async def get_markdown(url: str) -> str:
     async with AsyncWebCrawler() as crawler:
@@ -37,11 +39,20 @@ async def get_cleaned_html(url: str) -> str:
             print("Crawler failed for", url)
             raise err
 
+
+def replace_relative_urls(html_content, base_url):
+    """Function to replace relative URLs with absolute URLs"""
+    soup = BeautifulSoup(html_content, 'html.parser')
+    for tag in soup.find_all(href=True):
+        tag['href'] = urljoin(base_url, tag['href'])
+    return str(soup)
+
+
 if __name__ == "__main__":
     import sys
     
     if len(sys.argv) != 3:
-        print("Usage: python script.py <url> <output_file>")
+        print("Usage: python webpage_crawler.py <url> <output_file>")
         sys.exit(1)
     
     url = sys.argv[1]
@@ -50,4 +61,8 @@ if __name__ == "__main__":
     markdown = asyncio.run(get_markdown(url))
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write(markdown)
+
+    html = asyncio.run(get_cleaned_html(url))
+    with open(output_file+".html", 'w', encoding='utf-8') as f:
+        f.write(html)
 

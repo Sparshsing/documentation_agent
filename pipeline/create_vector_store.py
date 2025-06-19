@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 import logging
 import subprocess
 import hashlib
+from collections import deque
+import nest_asyncio
 
 from llama_index.core import SimpleDirectoryReader, StorageContext, VectorStoreIndex
 from llama_index.core.ingestion import IngestionPipeline
@@ -25,59 +27,93 @@ from llama_index.core.extractors import SummaryExtractor, TitleExtractor, Keywor
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.schema import MetadataMode
 from llama_index.core.storage.docstore import SimpleDocumentStore
-from custom_components.custom_google_genai import CustomGoogleGenAI
 from llama_index.llms.ollama import Ollama
 from llama_index.llms.groq import Groq
+from llama_index.llms.litellm import LiteLLM
 
 
 import chromadb
 import tiktoken
 
+import sys
+sys.path.append('..')
+
 from utilities import create_custom_logger, get_large_files, setup_llm_logs, GoogleGenAIDummyTokensizer, HuggingfaceTokenizer
 from custom_components.custom_extractors import CustomDocumentContextExtractor
 from custom_components.custom_parsers import CustomMarkdownNodeParser
+from custom_components.custom_google_genai import CustomGoogleGenAI
+
+
 load_dotenv()
-
-
-# todo:
-# 3. markdown: use Markdown splitter, but customize to handle token counts of chunk.
-# 5. sample data - https://www.gutenberg.org/cache/epub/24022/pg24022.txt
-# 6. sample data: 'https://raw.githubusercontent.com/run-llama/llama_index/main/docs/docs/examples/data/paul_graham/paul_graham_essay.txt'
-
-INPUT_DIR = 'data/langchain/docs/docs/'
-
-EXCLUDE_FILES = []  # files/folders to exclude. eg ['file.txt', 'folder1/', 'folder2/b.txt', 'folder2/folder3/']
-SKIP_LARGE_FILES_20KB = True
-# Find and exclude large files over 20KB if enabled
-if SKIP_LARGE_FILES_20KB:
-    large_files = get_large_files(INPUT_DIR, min_size_kb=50, extensions=('.txt', '.md', '.mdx'))
-    for file_path, size_kb in large_files:
-        # Convert absolute path to relative path from INPUT_DIR
-        rel_path = Path(file_path).absolute().relative_to(Path(INPUT_DIR).absolute()).as_posix()
-        EXCLUDE_FILES.append(rel_path)
-        print(f"Excluding large file: {rel_path} ({size_kb:.1f}KB)")
-
-# directory to store processed data like vecor store, doctore etc
-PROCESSED_DIR = (Path('processed_data') / '_'.join(Path(INPUT_DIR).relative_to('./data').parts)).as_posix()
 
 GEMINI_API_KEY = os.environ['GEMINI_API_KEY']
 GROQ_API_KEY = os.environ['GROQ_API_KEY']
+TOGETHER_API_KEY = os.environ['TOGETHER_API_KEY']
 
-DEFAULT_GEMINI_MODEL = "models/gemini-2.0-flash"  # "models/gemini-2.0-flash"
-GROQ_MODEL = "llama-3.3-70b-versatile"
-OLLAMA_MODEL = "llama3.1:8b-instruct-q8_0"
+# sample data - https://www.gutenberg.org/cache/epub/24022/pg24022.txt
+# sample data: 'https://raw.githubusercontent.com/run-llama/llama_index/main/docs/docs/examples/data/paul_graham/paul_graham_essay.txt'
+
+
+## Config
+INPUT_DIR = 'data/google_genai/api/'
+OUTPUT_DIR = 'processed_data/' + INPUT_DIR
+
+FILE_TYPES = ['.md', '.mdx']
+# Select Extractors - To add metadata to each node. Some of them may use many LLM calls. Use only if needed.
+METADATA_EXTRACTORS = ['CustomDocumentContextExtractor']  # choose from ['TitleExtractor', 'SummaryExtractor', 'KeywordExtractor', 'CustomDocumentContextExtractor' etc]
+
+CHROMADB_PATH = (Path(OUTPUT_DIR) / 'chromadb').as_posix()
+CHROMADB_COLLECTION = 'contextual_api'
+
+LLM_MODEL_PROVIDER = 'litellm'  # choose from ['litellm', 'ollama', 'gemini', 'groq']
+LLM_MODEL = "gemini/gemini-2.5-flash-preview-05-20" # "cerebras/llama-3.3-70b"  #  # "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo" # "cerebras/llama-3.3-70b"  # "groq/llama-3.3-70b-versatile"  # "cerebras/llama-3.3-70b"
+RATE_LIMIT = 7 # LLM req/min, -1 if no limit
+
+RUN_PARALLEL = False  # process nodes in parallel using async
+
+# LITELLM_MODEL = "gemini/gemini-2.5-flash-preview-05-20"  # "together_ai/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8" #
+# GEMINI_MODEL = "models/gemini-2.0-flash"  # "models/gemini-2.0-flash"
+# GROQ_MODEL = "llama-3.3-70b-versatile"
+# OLLAMA_MODEL = "llama3.1:8b-instruct-q8_0"
 
 HUGGINGFACE_EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
-DEFAULT_GEMINI_EMBEDDING_MODEL = "models/text-embedding-004"
+GEMINI_EMBEDDING_MODEL = "models/text-embedding-004"
 
-DEFAULT_GEMINI_TOKENIZER_MODEL = DEFAULT_GEMINI_MODEL
-HUGGINGFACE_TOKENIZER_MODEL = "meta-llama/Meta-Llama-3.1-70B-Instruct"
 TIKTOKEN_TOKENIZER_MODEL = "cl100k_base"
+GEMINI_TOKENIZER_MODEL = LLM_MODEL
+HUGGINGFACE_TOKENIZER_MODEL = "meta-llama/Meta-Llama-3.1-70B-Instruct"
+
+
+EMBEDDING_PROVIDER = 'GoogleGenAIEmbedding'  # choose from ['HuggingFaceEmbedding', 'GoogleGenAIEmbedding', etc]
+EMBEDDING_MODEL = GEMINI_EMBEDDING_MODEL
+
+# Only used for token counting, best use tiktoken unless accuracy is needed
+TOKENIZER_PROVIDER = 'tiktoken'  # chose from ['gemini', 'huggingface', 'tiktoken' etc]
+TOKENIZER_MODEL_NAME = TIKTOKEN_TOKENIZER_MODEL  # choose from ['models/gemini-2.0-flash', 'meta-llama/Meta-Llama-3.1-70B-Instruct', 'cl100k_base' etc]
+MAX_NODE_TOKENS = 2000
+
+DOCSTORE_PATH = (Path(OUTPUT_DIR) / 'docstore.json').as_posix()
+CONFIG_PATH = (Path(OUTPUT_DIR) / 'config.json').as_posix()
+
+
+EXCLUDE_FILES = ['__all_docs__.md']  # files/folders to exclude. eg ['file.txt', 'folder1/', 'folder2/b.txt', 'folder2/folder3/']
+SKIP_LARGE_FILES = True
+
+# Find and exclude large files over 20KB if enabled
+def get_large_files_to_exclude(excluded_files):
+    if SKIP_LARGE_FILES:
+        large_files = get_large_files(INPUT_DIR, min_size_kb=50, extensions=('.txt', '.md', '.mdx'))
+        for file_path, size_kb in large_files:
+            # Convert absolute path to relative path from INPUT_DIR
+            rel_path = Path(file_path).absolute().relative_to(Path(INPUT_DIR).absolute()).as_posix()
+            excluded_files.append(rel_path)
+            print(f"Excluding large file: {rel_path} ({size_kb:.1f}KB)")
+    return excluded_files
 
 
 def get_llm(config):
     if config['llm_model_provider'] == 'groq':
-        return Groq(model=GROQ_MODEL, api_key=GROQ_API_KEY, max_retries=2, retry_on_rate_limit=True) # Number of retry attempts
+        return Groq(model=config['llm_model'], api_key=GROQ_API_KEY, max_retries=2, retry_on_rate_limit=True) # Number of retry attempts
     elif config['llm_model_provider'] == 'gemini':
         return CustomGoogleGenAI(
             model=config['llm_model'],
@@ -86,7 +122,11 @@ def get_llm(config):
             retry_on_rate_limit=True
         )
     elif config['llm_model_provider'] == 'ollama':
-        return Ollama(model=OLLAMA_MODEL, request_timeout=120.0, context_window=8192, )
+        return Ollama(model=config['llm_model'], request_timeout=120.0, context_window=8192, )
+    elif config['llm_model_provider'] == 'litellm':
+        import litellm
+        litellm.suppress_debug_info = True
+        return LiteLLM(model=config['llm_model'], max_tokens=8192, max_retries=6)
     else:
         raise NotImplementedError(f"LLM provider {config['llm_model_provider']} invalid or not implemented")
 
@@ -176,7 +216,7 @@ def get_nodes_from_documents(documents, embed_model, tokenizer, max_tokens):
     nodes = []
     if len(md_docs) > 0:
         # md_node_parser = MarkdownNodeParser(chunk_size=512, chunk_overlap=32)
-        md_node_parser = CustomMarkdownNodeParser(max_tokens=max_tokens, split_pattern=r'\*\*(.*?)\*\*', tokenizer=tokenizer)
+        md_node_parser = CustomMarkdownNodeParser(max_tokens=max_tokens, max_header_level=2, split_pattern=r'\*\*(.*?)\*\*', tokenizer=tokenizer)
         md_nodes = md_node_parser.get_nodes_from_documents(md_docs)
         nodes += md_nodes
     if len(txt_docs) > 0:
@@ -200,89 +240,126 @@ def is_notebook():
         return False
     
 
-async def process_nodes_with_ratelimit(nodes, transformations, rate_limit=-1, max_retries=2, logger=None):
+async def process_nodes_with_ratelimit(nodes, transformations, run_parallel=True, rate_limit=-1, logger=None):
     if logger is None:
         logger = logging.getLogger(__name__)
     
+    actual_rate_limit = rate_limit
     # decrease rate limit as per the no of llm based transformers
     llm_ops = 0
     for transformation in transformations:
         if hasattr(transformation, 'llm'):
             llm_ops += 1
-    if llm_ops > 1 and rate_limit > 0:
-        rate_limit = rate_limit // llm_ops
-    
+    if llm_ops > 1 and actual_rate_limit > 0:
+        actual_rate_limit = actual_rate_limit // llm_ops
+
     transformed_nodes = []
-    batch_size = rate_limit if rate_limit > 0 else 100
-    total_batches = math.ceil(len(nodes) / batch_size)
+    batch_size_for_pipeline = actual_rate_limit if actual_rate_limit > 0 else 60 
+    
+    if not nodes: # Handle empty nodes list
+        return []
+
+    total_batches = math.ceil(len(nodes) / batch_size_for_pipeline)
+    
     for batch_idx in range(total_batches):
-        for retries in range(max_retries):
-            try:
-                batch_start = time.time()
-                # Get current batch of nodes
-                start_idx = batch_idx * batch_size
-                end_idx = min(start_idx + batch_size, len(nodes)) 
-                batch_nodes = nodes[start_idx:end_idx]
-                logger.info(f"batch {batch_idx} of {total_batches}, {len(batch_nodes)} nodes, start {batch_start}")
+        batch_start_time = time.time()
+        # Get current batch of nodes
+        start_idx = batch_idx * batch_size_for_pipeline
+        end_idx = min(start_idx + batch_size_for_pipeline, len(nodes)) 
+        batch_nodes = nodes[start_idx:end_idx]
+        
+        if not batch_nodes: # Should not happen if total_batches is calculated correctly from non-empty nodes
+            continue
 
-                pipeline = IngestionPipeline(
-                    transformations=transformations
-                )
-                batch_nodes = await pipeline.arun(nodes=batch_nodes, in_place=False, show_progress=False)
-                # batch_nodes = pipeline.run(nodes=batch_nodes, in_place=False, num_workers=4)
+        logger.info(f"Batch {batch_idx + 1}/{total_batches}, processing {len(batch_nodes)} nodes.")
 
+        pipeline = IngestionPipeline(
+            transformations=transformations
+        )
+        
+        if run_parallel:
+            batch_retries = 0
+            while True:
+                try:
+                    processed_batch = await pipeline.arun(nodes=batch_nodes, in_place=False, show_progress=False)
+                    # processed_batch = pipeline.run(nodes=batch_nodes, in_place=False, show_progress=False)
 
-                batch_end = time.time()
-                elapsed_time = batch_end - batch_start
-                logger.info(f"batch {batch_idx} finished in {elapsed_time:.1f}s")
-                if rate_limit > 0 and elapsed_time < 60:
-                    await asyncio.sleep(60 - elapsed_time)
+                    break
+                except Exception as e:
+                    logger.error(f"Error processing batch {batch_idx + 1}/{total_batches}. Retrying...: {e}")
+                    time.sleep(70)
+                    batch_retries += 1
+                    if batch_retries > 1:
+                        logger.error('Aborting batch ...')
+                        processed_batch = []
+                        break
+        else:  # process nodes one by one
+            processed_batch = []
+            for i, node in enumerate(batch_nodes):
+                node_failure = False
+                node_retries = 0
+                # for transformation in transformations:
+                processed_node = node
+                while True:
+                    try:
+                        processed_nodes = await pipeline.arun(nodes=[processed_node], in_place=False, show_progress=False)
+                        processed_node = processed_nodes[0]
+                        # processed_node = transformation.process_nodes(nodes=[processed_node], in_place=False, show_progress=False)
+                        # if hasattr(transformation, 'llm'):
+                        #     time.sleep(1)
+                        break
+                    except Exception as e:
+                        logger.error(f"Error processing node {i}. Retrying...: {e}")
+                        time.sleep(70)
+                        node_retries += 1
+                        if node_retries > 1:
+                            logger.error(f'Aborting node {i}...')
+                            node_failure = True
+                            break
+                if not node_failure:
+                    processed_batch.append(processed_node)
 
-                transformed_nodes.extend(batch_nodes)
-                break
-            except Exception as e:
-                if retries == max_retries - 1:
-                    logger.error(f"batch {batch_idx} Errored {e}, aborting. ")
-                    print('!!! Aborting due to too many errors')
-                    logger.error("!!! Aborting due to too many errors")
-                    return None
-
-                # print(f"batch {batch_idx} Errored, restarting", e)
-                logger.error(f"batch {batch_idx} Errored, restarting. "+ str(e))
-                await asyncio.sleep(60 * (retries+1)**2)
+        transformed_nodes.extend(processed_batch)
+        batch_end_time = time.time()
+        elapsed_time = batch_end_time - batch_start_time
+        logger.info(f"Batch {batch_idx + 1}/{total_batches} finished in {elapsed_time:.1f}s")
+        if actual_rate_limit > 0 and elapsed_time < 60:
+            await asyncio.sleep(60 - elapsed_time + 1)
                             
     return transformed_nodes
 
 
-async def create_vector_store():
+def setup_application_logging(output_dir):
 
-    LLM_MODEL_PROVIDER = 'gemini'  # choose from ['ollama', 'gemini', 'groq']
-    LLM_MODEL = DEFAULT_GEMINI_MODEL
-    RATE_LIMIT = 15 # LLM req/min, -1 if no limit
     
-    EMBEDDING_PROVIDER = 'GoogleGenAIEmbedding'  # choose from ['HuggingFaceEmbedding', 'GoogleGenAIEmbedding', etc]
-    EMBEDDING_MODEL = DEFAULT_GEMINI_EMBEDDING_MODEL
+    logging.basicConfig(
+        level=logging.WARNING,
+        filename=(Path(output_dir) / "warnings.log").as_posix(),              # All logs go here
+        filemode="a",                    # 'w' to overwrite each run
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
+    
+    # Create your application logger
+    logger = logging.getLogger('documentation_agent')  # Use your app name
+    logger.setLevel(logging.INFO)
+    logger.propagate = False  # Prevent propagation to root logger
+    
+    # Create file handler
+    file_handler = logging.FileHandler((Path(output_dir) / "rag.log").as_posix())
+    file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+    logger.addHandler(file_handler)
+    
+    return logger
 
-    TOKENIZER_PROVIDER = 'gemini'  # chose from ['gemini', 'huggingface', 'tiktoken' etc]
-    TOKENIZER_MODEL_NAME = DEFAULT_GEMINI_TOKENIZER_MODEL  # choose from ['models/gemini-2.0-flash', 'meta-llama/Meta-Llama-3.1-70B-Instruct', 'cl100k_base' etc]
-    MAX_NODE_TOKENS = 2000
 
-    FILE_TYPES = ['.md', '.mdx']
-    # Select Extractors - To add metadata to each node. Some of them may use many LLM calls. Use only if needed.
-    METADATA_EXTRACTORS = ['CustomDocumentContextExtractor']  # choose from ['TitleExtractor', 'SummaryExtractor', 'KeywordExtractor', 'CustomDocumentContextExtractor' etc]
-
-    CHROMADB_PATH = (Path(PROCESSED_DIR) / 'chromadb').as_posix()
-    CHROMADB_COLLECTION = 'contextual'
-
-    DOCSTORE_PATH = (Path(PROCESSED_DIR) / 'docstore.json').as_posix()
-    CONFIG_PATH = (Path(PROCESSED_DIR) / 'config.json').as_posix()
+async def create_vector_store():
     
     config = {
         'llm_model_provider': LLM_MODEL_PROVIDER,
-        'llm_model': DEFAULT_GEMINI_MODEL,
+        'llm_model': LLM_MODEL,
         'rate_limit': RATE_LIMIT,
         'input_dir': INPUT_DIR,
-        'output_dir': PROCESSED_DIR,
+        'output_dir': OUTPUT_DIR,
         'file_types': FILE_TYPES,
         'vector_store': 'chroma',
         'chromadb_path': CHROMADB_PATH,
@@ -297,12 +374,10 @@ async def create_vector_store():
         'datetime': datetime.now(timezone.utc).isoformat(),
     }
 
-    logging.basicConfig(filename=(Path(PROCESSED_DIR) / "rag.log").as_posix(), level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    logger = logging.getLogger(__name__)
-
-
-    llm_logger = create_custom_logger('LLMlogger', (Path(PROCESSED_DIR) / "llm_events.log").as_posix())
-    setup_llm_logs(llm_logger, Settings, show_text=False, short_inputs=False, short_outputs=False )
+    # Setup logging
+    logger = setup_application_logging(OUTPUT_DIR)
+    llm_logger = create_custom_logger('LLMlogger', (Path(OUTPUT_DIR) / "llm_events.log").as_posix())
+    setup_llm_logs(llm_logger, Settings, show_text=False, short_inputs=False, short_outputs=False)
 
     
     is_jupyter_notebook = is_notebook()
@@ -311,6 +386,8 @@ async def create_vector_store():
     if is_jupyter_notebook:
         import nest_asyncio
         nest_asyncio.apply()
+
+    # nest_asyncio.apply()
 
     # for jupyter notebook - Start ChromaDB server
     if is_jupyter_notebook:
@@ -346,7 +423,8 @@ async def create_vector_store():
     max_tokens = config['max_node_tokens']
 
     # Step 1: load Documents
-    documents = SimpleDirectoryReader(input_dir=INPUT_DIR, exclude=EXCLUDE_FILES, recursive=True, filename_as_id=True,
+    files_to_exlude = get_large_files_to_exclude(EXCLUDE_FILES)
+    documents = SimpleDirectoryReader(input_dir=INPUT_DIR, exclude=files_to_exlude, recursive=True, filename_as_id=True,
                                        required_exts=FILE_TYPES).load_data()
     for i, document in enumerate(documents):
         document.doc_id = Path(document.metadata['file_path']).relative_to(Path(INPUT_DIR).absolute()).as_posix()
@@ -366,8 +444,9 @@ async def create_vector_store():
     ## ! Important. #todo
     # Implement Logic to split markdown nodes further since Chunk size not followed by MarkdownNode parse
     try:
-        doc_batch_size = 5
+        doc_batch_size = 1
         all_nodes = []
+        # can be optimised to create docstore only for docs being processed in one iteration
         metadata_extractors = get_metadata_extractors(config, llm, original_docs_docstore)
         transformations = metadata_extractors + [embed_model]
         
@@ -401,9 +480,9 @@ async def create_vector_store():
 
             logger.info(f"processing {len(nodes)} nodes")
             # Step 3: extract metadata and embeddings for nodes
-            nodes = await process_nodes_with_ratelimit(nodes=nodes, transformations=transformations , rate_limit = RATE_LIMIT, logger=logger)
+            nodes = await process_nodes_with_ratelimit(nodes=nodes, transformations=transformations, run_parallel=RUN_PARALLEL, rate_limit = RATE_LIMIT, logger=logger)
             
-            if nodes is None:
+            if nodes is None or len(nodes) == 0:
                 raise Exception('Error processing nodes. Aborting.')
 
             # Step 4: Save the Nodes/Chunks in vector store
@@ -425,32 +504,43 @@ async def create_vector_store():
         
         
         # Check if config file exists and read existing config
+        all_configs = []
         if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, 'r') as fp:
-                existing_config = json.load(fp)
-                config = existing_config
+            try:
+                with open(CONFIG_PATH, 'r') as fp:
+                    content = fp.read()
+                    if content.strip(): # Ensure file is not empty
+                        all_configs = json.loads(content) # Changed from json.load(fp)
+                        if not isinstance(all_configs, list): # If existing config is not a list, wrap it in a list
+                            logger.warning(f"Existing config in {CONFIG_PATH} is not a list. Wrapping it in a list.")
+                            all_configs = [all_configs]
+            except json.JSONDecodeError:
+                logger.error(f"Could not decode JSON from {CONFIG_PATH}. Starting with an empty config list.")
+                all_configs = []
+            except Exception as e:
+                logger.error(f"An unexpected error occurred while reading {CONFIG_PATH}: {e}. Starting with an empty config list.")
+                all_configs = []
         
-        run_numbers = [int(k.split('_')[1]) for k in config.keys() if k.startswith('run_') and k.endswith('_time')]
-        next_run = 1 if not run_numbers else max(run_numbers) + 1
+        current_run_config = config.copy() # Use a copy to avoid modifying the original config dict for the current run
+        current_run_config['run_time'] = datetime.now(timezone.utc).isoformat()
+        current_run_config['run_nodes'] = len(all_nodes) if 'all_nodes' in locals() else 0 # ensure all_nodes exists
         
-        # Store the current run info
-        config[f'run_{next_run}_time'] = datetime.now(timezone.utc).isoformat()
-        config[f'run_{next_run}_nodes'] = len(all_nodes)
+        all_configs.append(current_run_config)
+
         with open(CONFIG_PATH, 'w') as fp:
-            json.dump(config, fp)
+            json.dump(all_configs, fp, indent=4)
         
-        if 'process' in locals():
+        if 'process' in locals() and process.poll() is None: # Check if process exists and is running
             process.terminate()
-            process.wait()
 
 
 def main():
     try:
-        Path(PROCESSED_DIR).mkdir(parents=True, exist_ok=True)
+        Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
     except FileExistsError as e:
-        print(f'Processed_data directory {PROCESSED_DIR} already exists. Please delete that or specify another directory.')
+        print(f'Processed_data directory {OUTPUT_DIR} already exists. Please delete that or specify another directory.')
         exit(1)
-    print('output dir', PROCESSED_DIR)
+    print('output dir', OUTPUT_DIR)
 
     
     t3 = time.time()
