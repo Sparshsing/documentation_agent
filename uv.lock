@@ -664,6 +664,15 @@ wheels = [
 ]
 
 [[package]]
+name = "dnspython"
+version = "2.7.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/4a/263763cb2ba3816dd94b08ad3a33d5fdae34ecb856678773cc40a3605829/dnspython-2.7.0.tar.gz", hash = "sha256:ce9c432eda0dc91cf618a5cedf1a4e142651196bbcd2c80e89ed5a907e5cfaf1", size = 345197 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/68/1b/e0a87d256e40e8c888847551b20a017a6b98139178505dc7ffb96f04e954/dnspython-2.7.0-py3-none-any.whl", hash = "sha256:b4c34b7d10b51bcc3a5071e7b8dee77939f1e878477eeecc965e9835f63c6c86", size = 313632 },
+]
+
+[[package]]
 name = "documentation-agent"
 version = "0.1.0"
 source = { virtual = "." }
@@ -705,10 +714,14 @@ dependencies = [
     { name = "deprecated" },
     { name = "dirtyjson" },
     { name = "distro" },
+    { name = "dnspython" },
     { name = "durationpy" },
+    { name = "email-validator" },
     { name = "executing" },
     { name = "fake-http-header" },
     { name = "fake-useragent" },
+    { name = "fastapi" },
+    { name = "fastapi-cli" },
     { name = "fastjsonschema" },
     { name = "filelock" },
     { name = "filetype" },
@@ -757,7 +770,9 @@ dependencies = [
     { name = "llama-index-core" },
     { name = "llama-index-embeddings-google-genai" },
     { name = "llama-index-embeddings-huggingface" },
+    { name = "llama-index-graph-stores-neo4j" },
     { name = "llama-index-instrumentation" },
+    { name = "llama-index-llms-google-genai" },
     { name = "llama-index-llms-groq" },
     { name = "llama-index-llms-litellm" },
     { name = "llama-index-llms-ollama" },
@@ -833,6 +848,7 @@ dependencies = [
     { name = "pystemmer" },
     { name = "python-dateutil" },
     { name = "python-dotenv" },
+    { name = "python-multipart" },
     { name = "pytz" },
     { name = "pywin32" },
     { name = "pyyaml" },
@@ -844,6 +860,7 @@ dependencies = [
     { name = "requests-oauthlib" },
     { name = "requests-toolbelt" },
     { name = "rich" },
+    { name = "rich-toolkit" },
     { name = "rpds-py" },
     { name = "rsa" },
     { name = "safetensors" },
@@ -858,6 +875,7 @@ dependencies = [
     { name = "soupsieve" },
     { name = "sqlalchemy" },
     { name = "stack-data" },
+    { name = "starlette" },
     { name = "sympy" },
     { name = "tenacity" },
     { name = "tf-playwright-stealth" },
@@ -927,10 +945,14 @@ requires-dist = [
     { name = "deprecated", specifier = "==1.2.18" },
     { name = "dirtyjson", specifier = "==1.0.8" },
     { name = "distro", specifier = "==1.9.0" },
+    { name = "dnspython", specifier = "==2.7.0" },
     { name = "durationpy", specifier = "==0.10" },
+    { name = "email-validator", specifier = "==2.2.0" },
     { name = "executing", specifier = "==2.2.0" },
     { name = "fake-http-header", specifier = "==0.3.5" },
     { name = "fake-useragent", specifier = "==2.2.0" },
+    { name = "fastapi", specifier = "==0.115.13" },
+    { name = "fastapi-cli", specifier = "==0.0.7" },
     { name = "fastjsonschema", specifier = "==2.21.1" },
     { name = "filelock", specifier = "==3.18.0" },
     { name = "filetype", specifier = "==1.2.0" },
@@ -979,7 +1001,9 @@ requires-dist = [
     { name = "llama-index-core", specifier = "==0.12.43" },
     { name = "llama-index-embeddings-google-genai", specifier = "==0.2.0" },
     { name = "llama-index-embeddings-huggingface", specifier = "==0.5.4" },
+    { name = "llama-index-graph-stores-neo4j", specifier = "==0.4.6" },
     { name = "llama-index-instrumentation", specifier = "==0.2.0" },
+    { name = "llama-index-llms-google-genai", specifier = "==0.2.1" },
     { name = "llama-index-llms-groq", specifier = "==0.3.2" },
     { name = "llama-index-llms-litellm", specifier = "==0.5.1" },
     { name = "llama-index-llms-ollama", specifier = "==0.6.2" },
@@ -1055,6 +1079,7 @@ requires-dist = [
     { name = "pystemmer", specifier = "==2.2.0.3" },
     { name = "python-dateutil", specifier = "==2.9.0.post0" },
     { name = "python-dotenv", specifier = "==1.1.0" },
+    { name = "python-multipart", specifier = "==0.0.20" },
     { name = "pytz", specifier = "==2025.2" },
     { name = "pywin32", specifier = "==310" },
     { name = "pyyaml", specifier = "==6.0.2" },
@@ -1066,6 +1091,7 @@ requires-dist = [
     { name = "requests-oauthlib", specifier = "==2.0.0" },
     { name = "requests-toolbelt", specifier = "==1.0.0" },
     { name = "rich", specifier = "==14.0.0" },
+    { name = "rich-toolkit", specifier = "==0.14.7" },
     { name = "rpds-py", specifier = "==0.25.1" },
     { name = "rsa", specifier = "==4.9.1" },
     { name = "safetensors", specifier = "==0.5.3" },
@@ -1080,6 +1106,7 @@ requires-dist = [
     { name = "soupsieve", specifier = "==2.7" },
     { name = "sqlalchemy", specifier = "==2.0.41" },
     { name = "stack-data", specifier = "==0.6.3" },
+    { name = "starlette", specifier = "==0.46.2" },
     { name = "sympy", specifier = "==1.14.0" },
     { name = "tenacity", specifier = "==8.5.0" },
     { name = "tf-playwright-stealth", specifier = "==1.2.0" },
@@ -1120,6 +1147,19 @@ wheels = [
 ]
 
 [[package]]
+name = "email-validator"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "dnspython" },
+    { name = "idna" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/ce/13508a1ec3f8bb981ae4ca79ea40384becc868bfae97fd1c942bb3a001b1/email_validator-2.2.0.tar.gz", hash = "sha256:cb690f344c617a714f22e66ae771445a1ceb46821152df8e165c5f9a364582b7", size = 48967 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/ee/bf0adb559ad3c786f12bcbc9296b3f5675f529199bef03e2df281fa1fadb/email_validator-2.2.0-py3-none-any.whl", hash = "sha256:561977c2d73ce3611850a06fa56b414621e0c8faa9d66f2611407d87465da631", size = 33521 },
+]
+
+[[package]]
 name = "executing"
 version = "2.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1143,6 +1183,34 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/41/43/948d10bf42735709edb5ae51e23297d034086f17fc7279fef385a7acb473/fake_useragent-2.2.0.tar.gz", hash = "sha256:4e6ab6571e40cc086d788523cf9e018f618d07f9050f822ff409a4dfe17c16b2", size = 158898 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/51/37/b3ea9cd5558ff4cb51957caca2193981c6b0ff30bd0d2630ac62505d99d0/fake_useragent-2.2.0-py3-none-any.whl", hash = "sha256:67f35ca4d847b0d298187443aaf020413746e56acd985a611908c73dba2daa24", size = 161695 },
+]
+
+[[package]]
+name = "fastapi"
+version = "0.115.13"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "starlette" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/20/64/ec0788201b5554e2a87c49af26b77a4d132f807a0fa9675257ac92c6aa0e/fastapi-0.115.13.tar.gz", hash = "sha256:55d1d25c2e1e0a0a50aceb1c8705cd932def273c102bff0b1c1da88b3c6eb307", size = 295680 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/59/4a/e17764385382062b0edbb35a26b7cf76d71e27e456546277a42ba6545c6e/fastapi-0.115.13-py3-none-any.whl", hash = "sha256:0a0cab59afa7bab22f5eb347f8c9864b681558c278395e94035a741fc10cd865", size = 95315 },
+]
+
+[[package]]
+name = "fastapi-cli"
+version = "0.0.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "rich-toolkit" },
+    { name = "typer" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fe/73/82a5831fbbf8ed75905bacf5b2d9d3dfd6f04d6968b29fe6f72a5ae9ceb1/fastapi_cli-0.0.7.tar.gz", hash = "sha256:02b3b65956f526412515907a0793c9094abd4bfb5457b389f645b0ea6ba3605e", size = 16753 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a1/e6/5daefc851b514ce2287d8f5d358ae4341089185f78f3217a69d0ce3a390c/fastapi_cli-0.0.7-py3-none-any.whl", hash = "sha256:d549368ff584b2804336c61f192d86ddea080c11255f375959627911944804f4", size = 10705 },
 ]
 
 [[package]]
@@ -1969,6 +2037,19 @@ wheels = [
 ]
 
 [[package]]
+name = "llama-index-graph-stores-neo4j"
+version = "0.4.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "llama-index-core" },
+    { name = "neo4j" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/87/7b/242521c3f3f95e4c53ce847a62b3d9f88bbfb9bb2ac99370c58d60084d58/llama_index_graph_stores_neo4j-0.4.6.tar.gz", hash = "sha256:c1398b196bbf5a7aecd6c5eab382c58a025547efe20065b152fea84c519f2c14", size = 15743 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/43/13/881eed340c1fa18b88f6697afc2bba189ba96f325c86239609d23a8796c8/llama_index_graph_stores_neo4j-0.4.6-py3-none-any.whl", hash = "sha256:097a6ab4d77bc9e289c9793bf2fdc042f686234c7b544427fda042439376ce2e", size = 17449 },
+]
+
+[[package]]
 name = "llama-index-instrumentation"
 version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1979,6 +2060,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ef/03/6a34612ecc03ab05cd4818b989cbd7c6bf83e9ffa94c7275847a82ff4f9f/llama_index_instrumentation-0.2.0.tar.gz", hash = "sha256:ae8333522487e22a33732924a9a08dfb456f54993c5c97d8340db3c620b76f13", size = 44023 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/96/b5/24ad1cf25b8c35b2075cfdd8c12d0f8390b7cfd54122ed704097bd755a2f/llama_index_instrumentation-0.2.0-py3-none-any.whl", hash = "sha256:1055ae7a3d19666671a8f1a62d08c90472552d9fcec7e84e6919b2acc92af605", size = 14966 },
+]
+
+[[package]]
+name = "llama-index-llms-google-genai"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-genai" },
+    { name = "llama-index-core" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a1/5f/74aea21973f18277c7cc17dacfdc51280143beae33ae5d0b80d69729a387/llama_index_llms_google_genai-0.2.1.tar.gz", hash = "sha256:dfaf32416bad342fe3388d33822e41e10fcd9d8b54314eb4a92df9cb7c254a4d", size = 10908 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/a2/73fb6c15b7e84eaf18f7cecefca97766a778d299e407893cc60e34314d1a/llama_index_llms_google_genai-0.2.1-py3-none-any.whl", hash = "sha256:823ea3726c7774d8890c8cdb096258a4ef9730242fea659ba107c0cddd0f9fa8", size = 11273 },
 ]
 
 [[package]]
@@ -3410,6 +3505,15 @@ wheels = [
 ]
 
 [[package]]
+name = "python-multipart"
+version = "0.0.20"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/87/f44d7c9f274c7ee665a29b885ec97089ec5dc034c7f3fafa03da9e39a09e/python_multipart-0.0.20.tar.gz", hash = "sha256:8dd0cab45b8e23064ae09147625994d090fa46f5b0d1e13af944c331a7fa9d13", size = 37158 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/45/58/38b5afbc1a800eeea951b9285d3912613f2603bdf897a4ab0f4bd7f405fc/python_multipart-0.0.20-py3-none-any.whl", hash = "sha256:8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104", size = 24546 },
+]
+
+[[package]]
 name = "pytz"
 version = "2025.2"
 source = { registry = "https://pypi.org/simple" }
@@ -3602,6 +3706,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a1/53/830aa4c3066a8ab0ae9a9955976fb770fe9c6102117c8ec4ab3ea62d89e8/rich-14.0.0.tar.gz", hash = "sha256:82f1bc23a6a21ebca4ae0c45af9bdbc492ed20231dcb63f297d6d1021a9d5725", size = 224078 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0d/9b/63f4c7ebc259242c89b3acafdb37b41d1185c07ff0011164674e9076b491/rich-14.0.0-py3-none-any.whl", hash = "sha256:1c9491e1951aac09caffd42f448ee3d04e58923ffe14993f6e83068dc395d7e0", size = 243229 },
+]
+
+[[package]]
+name = "rich-toolkit"
+version = "0.14.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "click" },
+    { name = "rich" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5b/7a/cb48b7024b247631ce39b1f14a0f1abedf311fb27b892b0e0387d809d4b5/rich_toolkit-0.14.7.tar.gz", hash = "sha256:6cca5a68850cc5778915f528eb785662c27ba3b4b2624612cce8340fa9701c5e", size = 104977 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0f/2e/95fde5b818dac9a37683ea064096323f593442d0f6358923c5f635974393/rich_toolkit-0.14.7-py3-none-any.whl", hash = "sha256:def05cc6e0f1176d6263b6a26648f16a62c4563b277ca2f8538683acdba1e0da", size = 24870 },
 ]
 
 [[package]]
@@ -3872,6 +3990,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/28/e3/55dcc2cfbc3ca9c29519eb6884dd1415ecb53b0e934862d3559ddcb7e20b/stack_data-0.6.3.tar.gz", hash = "sha256:836a778de4fec4dcd1dcd89ed8abff8a221f58308462e1c4aa2a3cf30148f0b9", size = 44707 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/7b/ce1eafaf1a76852e2ec9b22edecf1daa58175c090266e9f6c64afcd81d91/stack_data-0.6.3-py3-none-any.whl", hash = "sha256:d5558e0c25a4cb0853cddad3d77da9891a08cb85dd9f9f91b9f8cd66e511e695", size = 24521 },
+]
+
+[[package]]
+name = "starlette"
+version = "0.46.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ce/20/08dfcd9c983f6a6f4a1000d934b9e6d626cff8d2eeb77a89a68eef20a2b7/starlette-0.46.2.tar.gz", hash = "sha256:7f7361f34eed179294600af672f565727419830b54b7b084efe44bb82d2fccd5", size = 2580846 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8b/0c/9d30a4ebeb6db2b25a841afbb80f6ef9a854fc3b41be131d249a977b4959/starlette-0.46.2-py3-none-any.whl", hash = "sha256:595633ce89f8ffa71a015caed34a5b2dc1c0cdb3f0f1fbd1e69339cf2abeec35", size = 72037 },
 ]
 
 [[package]]
