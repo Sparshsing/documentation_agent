@@ -30,8 +30,7 @@ from llama_index.core.response_synthesizers.type import ResponseMode
 from llama_index.core.schema import NodeWithScore, QueryBundle, QueryType
 
 # import custom components
-PROJECT_ROOT = Path(__file__).parent.parent.as_posix()
-sys.path.append(PROJECT_ROOT)
+sys.path.append(str(Path(__file__).parent.absolute()))  # add the parent directory to the path
 from custom_components.custom_google_genai import CustomGoogleGenAI
 from utilities import GoogleGenAIDummyTokensizer, HuggingfaceTokenizer
 
@@ -88,7 +87,7 @@ def verify_config(config):
 def get_config(index):
     # load config file from processed dir
     processed_dir = INDEX_MAPPPING[index]
-    processed_dir = Path(PROJECT_ROOT) / 'pipeline' / processed_dir
+    processed_dir = Path(__file__).parent / processed_dir
     config_file = Path(processed_dir) / 'config.json'
     with open(config_file, 'r') as f:
         config = json.load(f)
@@ -175,7 +174,7 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
     Settings.embed_model = embed_model
     Settings.tokenizer = tokenizer
 
-    chroma_path = Path(PROJECT_ROOT) / 'pipeline' / config['chromadb_path']
+    chroma_path = Path(__file__).parent / config['chromadb_path']
     chroma_path = chroma_path.as_posix()
     chroma_colection_name = config['chroma_collection']
     db = chromadb.PersistentClient(path=chroma_path)
@@ -268,6 +267,15 @@ async def query_index(query, index, top_k=5, mode='hybrid', rerank=True, use_gra
         langfuse.flush()
     
     return response
+
+
+
+def get_nodes_tokens(nodes):
+    context = ''
+    for node in nodes:
+        context = context + '\n\n' + node.node.get_content(metadata_mode=MetadataMode.LLM)
+    token_count = len(Settings.tokenizer(context))
+    return token_count
 
 
 

@@ -36,7 +36,7 @@ import chromadb
 import tiktoken
 
 import sys
-sys.path.append('..')
+sys.path.append(str(Path(__file__).parent.absolute()))  # add the parent directory to the path
 
 from utilities import create_custom_logger, get_large_files, setup_llm_logs, GoogleGenAIDummyTokensizer, HuggingfaceTokenizer
 from custom_components.custom_extractors import CustomDocumentContextExtractor
