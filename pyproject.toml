@@ -1,7 +1,7 @@
 [project]
 name = "documentation-agent"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 dependencies = [
     "aiofiles==24.1.0",
     "aiohappyeyeballs==2.6.1",
@@ -56,6 +56,7 @@ dependencies = [
     "fsspec==2025.5.1",
     "google-auth==2.40.3",
     "google-genai==1.21.1",
+    "google-generativeai>=0.8.5",
     "googleapis-common-protos==1.70.0",
     "greenlet==3.2.3",
     "griffe==1.7.3",
