@@ -46,33 +46,37 @@ from custom_components.custom_google_genai import CustomGoogleGenAI
 
 load_dotenv()
 
-GEMINI_API_KEY = os.environ['GEMINI_API_KEY']
-GROQ_API_KEY = os.environ['GROQ_API_KEY']
-TOGETHER_API_KEY = os.environ['TOGETHER_API_KEY']
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+TOGETHER_API_KEY = os.environ.get('TOGETHER_API_KEY', '')
 
 # sample data - https://www.gutenberg.org/cache/epub/24022/pg24022.txt
 # sample data: 'https://raw.githubusercontent.com/run-llama/llama_index/main/docs/docs/examples/data/paul_graham/paul_graham_essay.txt'
 
+ROOT_OUTPUT_DIR = os.environ.get('PROCESSED_DATA_PATH', 'processed_data')
+
+DEFAULT_CHROMADB_PATH = ROOT_OUTPUT_DIR + '/' + 'chromadb'
 
 ## Config
-INPUT_DIR = 'data/google_genai/api/'
-OUTPUT_DIR = 'processed_data/' + INPUT_DIR
+INDEX_NAME = 'google_genai-api'
+INPUT_DIR = 'data/google_genai/api/'  # change this to the input directory
+OUTPUT_DIR = ROOT_OUTPUT_DIR + '/' + INDEX_NAME  # do not change this
 
 FILE_TYPES = ['.md', '.mdx']
 # Select Extractors - To add metadata to each node. Some of them may use many LLM calls. Use only if needed.
 METADATA_EXTRACTORS = ['CustomDocumentContextExtractor']  # choose from ['TitleExtractor', 'SummaryExtractor', 'KeywordExtractor', 'CustomDocumentContextExtractor' etc]
 
-CHROMADB_PATH = (Path(OUTPUT_DIR) / 'chromadb').as_posix()
-CHROMADB_COLLECTION = 'contextual_api'
+CHROMADB_PATH = DEFAULT_CHROMADB_PATH  # change if you like
+CHROMADB_COLLECTION = INDEX_NAME
 
 LLM_MODEL_PROVIDER = 'litellm'  # choose from ['litellm', 'ollama', 'gemini', 'groq']
-LLM_MODEL = "gemini/gemini-2.5-flash-preview-05-20" # "cerebras/llama-3.3-70b"  #  # "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo" # "cerebras/llama-3.3-70b"  # "groq/llama-3.3-70b-versatile"  # "cerebras/llama-3.3-70b"
+LLM_MODEL = "gemini/gemini-2.5-flash" # "cerebras/llama-3.3-70b"  #  # "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo" # "cerebras/llama-3.3-70b"  # "groq/llama-3.3-70b-versatile"  # "cerebras/llama-3.3-70b"
 RATE_LIMIT = 7 # LLM req/min, -1 if no limit
 
 RUN_PARALLEL = False  # process nodes in parallel using async
 
-# LITELLM_MODEL = "gemini/gemini-2.5-flash-preview-05-20"  # "together_ai/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8" #
-# GEMINI_MODEL = "models/gemini-2.0-flash"  # "models/gemini-2.0-flash"
+# LITELLM_MODEL = "gemini/gemini-2.5-flash"  # "together_ai/meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8" #
+# GEMINI_MODEL = "models/gemini-2.5-flash"  # "models/gemini-2.5-flash"
 # GROQ_MODEL = "llama-3.3-70b-versatile"
 # OLLAMA_MODEL = "llama3.1:8b-instruct-q8_0"
 
@@ -95,9 +99,27 @@ MAX_NODE_TOKENS = 2000
 DOCSTORE_PATH = (Path(OUTPUT_DIR) / 'docstore.json').as_posix()
 CONFIG_PATH = (Path(OUTPUT_DIR) / 'config.json').as_posix()
 
-
 EXCLUDE_FILES = ['__all_docs__.md']  # files/folders to exclude. eg ['file.txt', 'folder1/', 'folder2/b.txt', 'folder2/folder3/']
 SKIP_LARGE_FILES = True
+
+def load_existing_configs(config_path):
+    """Load existing configs from the config file, handling errors gracefully."""
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, 'r') as fp:
+                content = fp.read()
+                if content.strip():  # Ensure file is not empty
+                    configs = json.loads(content)  # Changed from json.load(fp)
+                    if not isinstance(configs, list):  # If existing config is not a list, wrap it in a list
+                        logger.warning(f"Existing config in {config_path} is not a list. Wrapping it in a list.")
+                        configs = [configs]
+                    return configs
+        except json.JSONDecodeError:
+            raise Exception(f"Could not decode JSON from {config_path}. Starting with an empty config list.")
+        except Exception as e:
+            raise Exception(f"An unexpected error occurred while reading {config_path}: {e}. Starting with an empty config list.")
+    return []
+
 
 # Find and exclude large files over 20KB if enabled
 def get_large_files_to_exclude(excluded_files):
@@ -199,36 +221,31 @@ def get_metadata_extractors(config, llm, docstore=None):
     return metadata_extractors
 
 
-def get_nodes_from_documents(documents, embed_model, tokenizer, max_tokens):
-    md_docs = []
-    txt_docs = []
-    py_docs = []
-    for doc in documents:
-        if Path(doc.metadata['file_name']).suffix.lower() in ('.md', '.mdx'):
-            md_docs.append(doc)
-        elif Path(doc.metadata['file_name']).suffix.lower() == '.txt':
-            txt_docs.append(doc)
-        elif Path(doc.metadata['file_name']).suffix.lower() == '.py':
-            py_docs.append(doc)
-        else:
-            raise ValueError(f"Filetype not supported.")
+def get_nodes_from_document(document, embed_model, tokenizer, max_tokens, max_header_level=3):
+    file_extension = Path(document.metadata['file_name']).suffix.lower()
+    if file_extension in ('.md', '.mdx'):
+        node_parser = CustomMarkdownNodeParser(max_tokens=max_tokens, max_header_level=max_header_level, split_pattern=r'\*\*(.*?)\*\*', tokenizer=tokenizer)
+    elif file_extension == '.txt':
+        node_parser = SemanticSplitterNodeParser(buffer_size=3, embed_model=embed_model)
+    elif file_extension == '.py':
+        node_parser = CodeSplitter(language='python', chunk_lines=70, chunk_lines_overlap=10, max_chars=3000)
+    else:
+        raise ValueError(f"Filetype not supported.")
     
-    nodes = []
-    if len(md_docs) > 0:
-        # md_node_parser = MarkdownNodeParser(chunk_size=512, chunk_overlap=32)
-        md_node_parser = CustomMarkdownNodeParser(max_tokens=max_tokens, max_header_level=2, split_pattern=r'\*\*(.*?)\*\*', tokenizer=tokenizer)
-        md_nodes = md_node_parser.get_nodes_from_documents(md_docs)
-        nodes += md_nodes
-    if len(txt_docs) > 0:
-        txt_node_parser = SemanticSplitterNodeParser(buffer_size=3, embed_model=embed_model)
-        txt_nodes = txt_node_parser.get_nodes_from_documents(txt_docs)
-        nodes += txt_nodes
-    if len(py_docs) > 0:
-        py_node_parser = CodeSplitter(language='python', chunk_lines=70, chunk_lines_overlap=10, max_chars=3000)
-        py_nodes = py_node_parser.get_nodes_from_documents(py_docs)
-        nodes += py_nodes
-    
+    nodes = node_parser.get_nodes_from_documents([document])
     return nodes
+
+def get_nodes_from_documents(documents, embed_model, tokenizer, max_tokens):
+    all_nodes = []
+    for document in documents:
+        nodes = get_nodes_from_document(document, embed_model, tokenizer, max_tokens)
+        # if file is markdown and has more than 20 nodes, use max_header_level=2 to reduce the no of chunks
+        if len(nodes) > 20:
+            file_extension = Path(document.metadata['file_name']).suffix.lower()
+            if file_extension in ('.md', '.mdx'):
+                nodes = get_nodes_from_document(document, embed_model, tokenizer, max_tokens, max_header_level=2)
+        all_nodes.extend(nodes)
+    return all_nodes
 
 
 
@@ -330,8 +347,6 @@ async def process_nodes_with_ratelimit(nodes, transformations, run_parallel=True
 
 
 def setup_application_logging(output_dir):
-
-    
     logging.basicConfig(
         level=logging.WARNING,
         filename=(Path(output_dir) / "warnings.log").as_posix(),              # All logs go here
@@ -340,7 +355,7 @@ def setup_application_logging(output_dir):
     )
     
     # Create your application logger
-    logger = logging.getLogger('documentation_agent')  # Use your app name
+    logger = logging.getLogger('documentation_agent')
     logger.setLevel(logging.INFO)
     logger.propagate = False  # Prevent propagation to root logger
     
@@ -352,27 +367,14 @@ def setup_application_logging(output_dir):
     return logger
 
 
-async def create_vector_store():
+async def create_vector_store(config):
     
-    config = {
-        'llm_model_provider': LLM_MODEL_PROVIDER,
-        'llm_model': LLM_MODEL,
-        'rate_limit': RATE_LIMIT,
-        'input_dir': INPUT_DIR,
-        'output_dir': OUTPUT_DIR,
-        'file_types': FILE_TYPES,
-        'vector_store': 'chroma',
-        'chromadb_path': CHROMADB_PATH,
-        'chroma_collection': CHROMADB_COLLECTION,
-        'doctsore_path': DOCSTORE_PATH,
-        'embedding_provider': EMBEDDING_PROVIDER,
-        'embedding_model': EMBEDDING_MODEL,
-        'tokenizer_provider': TOKENIZER_PROVIDER,
-        'tokenizer_model_name': TOKENIZER_MODEL_NAME,
-        'max_node_tokens': MAX_NODE_TOKENS,
-        'metadata_extractors': METADATA_EXTRACTORS,
-        'datetime': datetime.now(timezone.utc).isoformat(),
-    }
+    # check if embedding model is consistent if config exists (in case of rerun)
+    existing_configs = load_existing_configs(CONFIG_PATH)
+    if len(existing_configs) > 0:
+        if existing_configs[-1]['embedding_model'] != EMBEDDING_MODEL:
+            raise Exception(f"Embedding model mismatch: Current model '{EMBEDDING_MODEL}' differs from last run's model '{existing_configs[-1]['embedding_model']}'. Using different embedding models will make vector store incompatible.")
+
 
     # Setup logging
     logger = setup_application_logging(OUTPUT_DIR)
@@ -504,26 +506,12 @@ async def create_vector_store():
         
         
         # Check if config file exists and read existing config
-        all_configs = []
-        if os.path.exists(CONFIG_PATH):
-            try:
-                with open(CONFIG_PATH, 'r') as fp:
-                    content = fp.read()
-                    if content.strip(): # Ensure file is not empty
-                        all_configs = json.loads(content) # Changed from json.load(fp)
-                        if not isinstance(all_configs, list): # If existing config is not a list, wrap it in a list
-                            logger.warning(f"Existing config in {CONFIG_PATH} is not a list. Wrapping it in a list.")
-                            all_configs = [all_configs]
-            except json.JSONDecodeError:
-                logger.error(f"Could not decode JSON from {CONFIG_PATH}. Starting with an empty config list.")
-                all_configs = []
-            except Exception as e:
-                logger.error(f"An unexpected error occurred while reading {CONFIG_PATH}: {e}. Starting with an empty config list.")
-                all_configs = []
+        all_configs = existing_configs
         
         current_run_config = config.copy() # Use a copy to avoid modifying the original config dict for the current run
         current_run_config['run_time'] = datetime.now(timezone.utc).isoformat()
         current_run_config['run_nodes'] = len(all_nodes) if 'all_nodes' in locals() else 0 # ensure all_nodes exists
+        current_run_config['run_docs'] = list(set([node.ref_doc_id for node in all_nodes]))
         
         all_configs.append(current_run_config)
 
@@ -542,9 +530,29 @@ def main():
         exit(1)
     print('output dir', OUTPUT_DIR)
 
+    config = {
+        'index_name': INDEX_NAME,
+        'llm_model_provider': LLM_MODEL_PROVIDER,
+        'llm_model': LLM_MODEL,
+        'rate_limit': RATE_LIMIT,
+        'input_dir': INPUT_DIR,
+        'output_dir': OUTPUT_DIR,
+        'file_types': FILE_TYPES,
+        'vector_store': 'chroma',
+        'chromadb_path': CHROMADB_PATH,
+        'chroma_collection': CHROMADB_COLLECTION,
+        'doctsore_path': DOCSTORE_PATH,
+        'embedding_provider': EMBEDDING_PROVIDER,
+        'embedding_model': EMBEDDING_MODEL,
+        'tokenizer_provider': TOKENIZER_PROVIDER,
+        'tokenizer_model_name': TOKENIZER_MODEL_NAME,
+        'max_node_tokens': MAX_NODE_TOKENS,
+        'metadata_extractors': METADATA_EXTRACTORS,
+        'datetime': datetime.now(timezone.utc).isoformat(),
+    }
     
     t3 = time.time()
-    asyncio.run(create_vector_store())
+    asyncio.run(create_vector_store(config))
     t4 = time.time()
     print('time', round(t4-t3))
 

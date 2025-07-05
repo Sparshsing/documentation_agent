@@ -22,6 +22,7 @@ annotated-types==0.7.0
 anyio==4.9.0
     # via
     #   google-genai
+    #   groq
     #   httpx
     #   openai
     #   starlette
@@ -117,6 +118,7 @@ dirtyjson==1.0.8
     # via llama-index-core
 distro==1.9.0
     # via
+    #   groq
     #   openai
     #   posthog
 dnspython==2.7.0
@@ -195,6 +197,8 @@ greenlet==3.2.3
     #   sqlalchemy
 griffe==1.7.3
     # via banks
+groq==0.29.0
+    # via langchain-groq
 grpcio==1.73.1
     # via
     #   chromadb
@@ -223,6 +227,7 @@ httpx==0.28.1
     #   cohere
     #   crawl4ai
     #   google-genai
+    #   groq
     #   langfuse
     #   langsmith
     #   litellm
@@ -310,7 +315,10 @@ langchain-core==0.3.67
     # via
     #   langchain
     #   langchain-community
+    #   langchain-groq
     #   langchain-text-splitters
+langchain-groq==0.2.1
+    # via documentation-agent (pyproject.toml)
 langchain-text-splitters==0.3.8
     # via langchain
 langfuse==3.1.0
@@ -586,6 +594,7 @@ pydantic==2.11.7
     #   fastapi
     #   google-genai
     #   google-generativeai
+    #   groq
     #   langchain
     #   langchain-core
     #   langfuse
@@ -726,6 +735,7 @@ six==1.17.0
 sniffio==1.3.1
     # via
     #   anyio
+    #   groq
     #   openai
 snowballstemmer==2.2.0
     # via crawl4ai
@@ -814,6 +824,7 @@ typing-extensions==4.14.0
     #   fastapi
     #   google-genai
     #   google-generativeai
+    #   groq
     #   huggingface-hub
     #   ipython
     #   langchain-core

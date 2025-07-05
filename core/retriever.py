@@ -1,6 +1,7 @@
 import os
 import sys
 import json
+import time
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -38,18 +39,22 @@ from utilities import GoogleGenAIDummyTokensizer, HuggingfaceTokenizer
 load_dotenv()
 
 
+PROJECT_ROOT = Path(__file__).parent.parent
+PROCESSED_DATA_PATH = os.environ.get('PROCESSED_DATA_PATH', 'processed_data')
+
+# INDEX_MAPPPING = {
+#     'google_genai-api': 'data/google_genai/api',
+#     'google_genai-docs': 'data/google_genai/docs',
+# }
+
 # Configuration
-INDEX_MAPPPING = {
-    'google_genai-api': 'processed_data/data/google_genai/api',
-    'google_genai-docs': 'processed_data/data/google_genai/docs',
-}
-
 LLM_MODEL_PROVIDER = 'litellm'  # choose from ['litellm', 'ollama', 'gemini', 'groq']
-LLM_MODEL = "gemini/gemini-2.5-flash-preview-05-20" # "cerebras/llama-3.3-70b"  #  # "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo" # "cerebras/llama-3.3-70b"  # "groq/llama-3.3-70b-versatile"  # "cerebras/llama-3.3-70b"
+LLM_MODEL = "gemini/gemini-2.5-flash" # "cerebras/llama-3.3-70b"  #  # "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo" # "cerebras/llama-3.3-70b"  # "groq/llama-3.3-70b-versatile"  # "cerebras/llama-3.3-70b"
+USE_DEFAULT_TOKENIZER = True
 
-GEMINI_API_KEY = os.environ['GEMINI_API_KEY']
-GROQ_API_KEY = os.environ['GROQ_API_KEY']
-COHERE_API_KEY = os.environ['COHERE_API_KEY']
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
+COHERE_API_KEY = os.environ.get('COHERE_API_KEY', '')
 
 GRAPH_AVAILABLE = False
 
@@ -86,9 +91,7 @@ def verify_config(config):
 
 def get_config(index):
     # load config file from processed dir
-    processed_dir = INDEX_MAPPPING[index]
-    processed_dir = Path(__file__).parent / processed_dir
-    config_file = Path(processed_dir) / 'config.json'
+    config_file = Path(PROCESSED_DATA_PATH) / index / 'config.json'
     with open(config_file, 'r') as f:
         config = json.load(f)
     if not verify_config(config):
@@ -162,29 +165,40 @@ def initialize_langfuse():
 
 async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_graph=False, config=None):
     # modes: vector, keyword, hybrid (default)
+    
+    start_time = time.time()
+    print(f"Starting retrieve_nodes for query: {query[:50]}...")
 
     if config is None:
         config = get_config(index)
     
-    llm = get_llm(config['llm_model_provider'], config['llm_model'])
+    llm = get_llm(llm_model_provider=LLM_MODEL_PROVIDER, llm_model=LLM_MODEL)
     embed_model = get_embed_model(config['embedding_provider'], config['embedding_model'])
-    tokenizer = get_tokenizer(config['tokenizer_provider'], config['tokenizer_model_name'], llm)
 
     Settings.llm = llm
     Settings.embed_model = embed_model
-    Settings.tokenizer = tokenizer
+    
+    if not USE_DEFAULT_TOKENIZER:
+        tokenizer = get_tokenizer(config['tokenizer_provider'], config['tokenizer_model_name'], llm)
+        Settings.tokenizer = tokenizer
 
-    chroma_path = Path(__file__).parent / config['chromadb_path']
+    setup_time = time.time()
+    
+    chroma_path = Path(PROCESSED_DATA_PATH) / 'chromadb'
     chroma_path = chroma_path.as_posix()
     chroma_colection_name = config['chroma_collection']
-    db = chromadb.PersistentClient(path=chroma_path)
-    chroma_collection = db.get_or_create_collection(chroma_colection_name)
+    db = chromadb.HttpClient(port=8001)
+    # db = chromadb.PersistentClient(path=chroma_path)
+    chroma_collection = db.get_collection(chroma_colection_name)
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     print('Vector store loaded. total node count:', chroma_collection.count())
     
+    vector_store_time = time.time()
+    
     if use_graph and not GRAPH_AVAILABLE:
-        print('Graph not available. Using vector index/keyword index.')
+        raise ValueError('Graph not available. Using vector index/keyword index.')
 
+    # langfuse, langfuse_available = None, False #initialize_langfuse()
     langfuse, langfuse_available = initialize_langfuse()
     
     # retrieve more initial nodes in case of rerank
@@ -199,7 +213,7 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
     
     elif mode == 'keyword':
         nodes_info = chroma_collection.get()
-        all_nodes = vector_store.get_nodes(nodes_info['ids'])
+        all_nodes = await vector_store.aget_nodes(nodes_info['ids'])
         retriever = BM25Retriever.from_defaults(nodes=all_nodes, similarity_top_k=similarity_top_k)
         
     elif mode == 'hybrid':
@@ -210,7 +224,7 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
         vector_retriever = vector_index.as_retriever(similarity_top_k=similarity_top_k)
         
         nodes_info = chroma_collection.get()
-        all_nodes = vector_store.get_nodes(nodes_info['ids'])
+        all_nodes = await vector_store.aget_nodes(nodes_info['ids'])
         keyword_retriever = BM25Retriever.from_defaults(nodes=all_nodes, similarity_top_k=similarity_top_k)
 
         retriever = QueryFusionRetriever(
@@ -223,6 +237,8 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
             use_async=True,
         )
 
+    retriever_setup_time = time.time()
+
     # retrieve the nodes
     if not langfuse_available:
         retrieved_nodes = await retriever.aretrieve(query)
@@ -231,12 +247,30 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
             retrieved_nodes = await retriever.aretrieve(query)
         langfuse.flush()
 
+    retrieval_time = time.time()
+
     # rerank
     if rerank:
         cohere_rerank = CohereRerank(
             top_n=top_k, model="rerank-v3.5", api_key=COHERE_API_KEY
         )
         retrieved_nodes = cohere_rerank.postprocess_nodes(nodes=retrieved_nodes, query_str=query)
+
+    rerank_time = time.time()
+    
+    # Print timing breakdown
+    print(f"\n=== TIMING BREAKDOWN ===")
+    print(f"Setup (LLM, embeddings, settings): {setup_time - start_time:.3f}s")
+    print(f"Vector store loading: {vector_store_time - setup_time:.3f}s")
+    print(f"Retriever setup ({mode} mode): {retriever_setup_time - vector_store_time:.3f}s")
+    print(f"Node retrieval: {retrieval_time - retriever_setup_time:.3f}s")
+    if rerank:
+        print(f"Reranking: {rerank_time - retrieval_time:.3f}s")
+        print(f"Total time: {rerank_time - start_time:.3f}s")
+    else:
+        print(f"Reranking: skipped")
+        print(f"Total time: {retrieval_time - start_time:.3f}s")
+    print(f"========================\n")
 
     return retrieved_nodes
 
@@ -247,13 +281,15 @@ async def query_index(query, index, top_k=5, mode='hybrid', rerank=True, use_gra
     
     retieved_nodes = await retrieve_nodes(query, index, top_k=top_k, mode=mode, rerank=rerank, use_graph=use_graph, config=config)
 
-    llm = get_llm(config['llm_model_provider'], config['llm_model'])
+    llm = get_llm(llm_model_provider=LLM_MODEL_PROVIDER, llm_model=LLM_MODEL)
     embed_model = get_embed_model(config['embedding_provider'], config['embedding_model'])
-    tokenizer = get_tokenizer(config['tokenizer_provider'], config['tokenizer_model_name'], llm)
 
     Settings.llm = llm
     Settings.embed_model = embed_model
-    Settings.tokenizer = tokenizer
+
+    if not USE_DEFAULT_TOKENIZER:
+        tokenizer = get_tokenizer(config['tokenizer_provider'], config['tokenizer_model_name'], llm)
+        Settings.tokenizer = tokenizer
 
     langfuse, langfuse_available = initialize_langfuse()
 
