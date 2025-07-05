@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  api:
+    image: documentation-agent-api
+    build: .
+    container_name: documentation-agent-container
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      # This mounts the host's chromadb data directory into the container
+      - ${DATA_HOST_PATH}:/app/processed_data
+    # restart: unless-stopped

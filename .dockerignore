@@ -1,0 +1,42 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+.env
+.env.prod
+
+# Git
+.git/
+
+# Logs
+logs/
+*.log
+
+# Jupyter & notebooks
+*.ipynb
+
+# Frontend code (not needed for backend deployment)
+frontend/
+
+# Test & documentation data
+tests/
+experiment_notebooks/
+notebooks/
+
+# ChromaDB data (will be mounted as volumes)
+data/
+processed_data/
+core/data/
+core/processed_data/
+
+# OS / Editor files
+.DS_Store
+.idea/
+.vscode/ 
