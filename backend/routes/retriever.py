@@ -107,12 +107,12 @@ async def get_available_indexes():
         {
             "name": "google_genai-api",
             "description": "Google Genai Gemini api documentation",
-            "type": "vector_store"
+            "source": "https://ai.google.dev/api"
         },
         {
             "name": "google_genai-docs", 
             "description": "Google Genai Gemini documentation",
-            "type": "vector_store"
+            "source": "https://ai.google.dev/gemini-api/docs"
         },
     ]
     
@@ -129,6 +129,6 @@ async def retriever_status():
     try:
         # Test if functions are importable
         from core.retriever import retrieve_nodes, query_index
-        return {"status": "available", "functions": ["retrieve_nodes", "query_index"]}
+        return {"status": "available", "functions": ["retrieve_nodes", "query_index", "indexes"]}
     except ImportError as e:
         return {"status": "unavailable", "error": str(e)}
