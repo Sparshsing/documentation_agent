@@ -6,10 +6,11 @@ services:
     build: .
     container_name: documentation-agent-container
     ports:
-      - "8000:8000"
+      # The container is now only accessible from the VM itself. (local pc if running on local)
+      - "127.0.0.1:8000:8000"
     env_file:
       - .env
     volumes:
       # This mounts the host's chromadb data directory into the container
       - ${DATA_HOST_PATH}:/app/processed_data
-    # restart: unless-stopped
+    restart: unless-stopped
