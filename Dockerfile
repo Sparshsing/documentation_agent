@@ -36,6 +36,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Create a non-root user to run the app
 RUN addgroup --system app && adduser --system --group app
 
+# Install 'gosu' for dropping privileges ---
+# We use a multi-step process to keep the final image clean.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends gosu \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy built wheel files from builder and install
