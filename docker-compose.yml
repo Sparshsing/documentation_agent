@@ -1,16 +1,19 @@
-version: '3.8'
-
+# docker-compose.yml (MODIFIED for Production with Docker Hub)
 services:
   api:
-    image: documentation-agent-api
-    build: .
+    # Use the image from Docker Hub. Docker will pull it automatically.
+    # Make sure to use your actual username and repository name.
+    image: sparshsing96/documentation-agent-api:latest
+    
+    # Uncomment 'build: .' section in local development.
+    # build: .
+    
     container_name: documentation-agent-container
     ports:
-      # The container is now only accessible from the VM itself. (local pc if running on local)
+      # Keep this bound to localhost for security (Nginx will proxy)
       - "127.0.0.1:8000:8000"
     env_file:
       - .env
     volumes:
-      # This mounts the host's chromadb data directory into the container
       - ${DATA_HOST_PATH}:/app/processed_data
     restart: unless-stopped
