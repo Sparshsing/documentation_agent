@@ -47,18 +47,24 @@ COPY backend ./backend
 COPY core ./core
 COPY pyproject.toml ./
 
-# --- NEW SECTION ---
 # Create the directory for ChromaDB and set ownership for the 'app' user.
 # This ensures that when we mount a volume here, the user has permissions.
 # We use /app/processed_data as the path inside the container.
 RUN mkdir -p /app/processed_data && chown -R app:app /app/processed_data
-# --- END NEW SECTION ---
+
+# Copy and set up the entrypoint script --- Required to set permissions for data volume mount
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Expose the API port
 EXPOSE 8000
 
 # Switch to non-root user
-USER app
+# USER app
+# The entrypoint will start as root and then switch to the 'app' user.
+
+# Set the entrypoint script to be the main executable
+ENTRYPOINT ["entrypoint.sh"]
 
 # Use gunicorn with uvicorn workers for production-grade serving
 CMD ["gunicorn", "backend.main:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "1", "-b", "0.0.0.0:8000"] 

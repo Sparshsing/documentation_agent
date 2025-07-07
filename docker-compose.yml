@@ -2,10 +2,10 @@
 services:
   api:
     # Use the image from Docker Hub. Docker will pull it automatically.
-    # Make sure to use your actual username and repository name.
     image: sparshsing96/documentation-agent-api:latest
     
-    # Uncomment 'build: .' section in local development.
+    # Uncomment in local development.
+    # image: documentation-agent-api
     # build: .
     
     container_name: documentation-agent-container
