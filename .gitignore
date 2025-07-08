@@ -6,6 +6,8 @@ data/
 logs/
 temp_files/
 *.md
+!README.md
+!README_DEPLOY.md
 *.json
 .aider*
 .env
