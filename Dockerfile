@@ -36,12 +36,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Create a non-root user to run the app
 RUN addgroup --system app && adduser --system --group app
 
-# Install 'gosu' for dropping privileges ---
-# We use a multi-step process to keep the final image clean.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends gosu \
-    && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
 
 # Copy built wheel files from builder and install
@@ -53,24 +47,15 @@ COPY backend ./backend
 COPY core ./core
 COPY pyproject.toml ./
 
-# Create the directory for ChromaDB and set ownership for the 'app' user.
-# This ensures that when we mount a volume here, the user has permissions.
-# We use /app/processed_data as the path inside the container.
-RUN mkdir -p /app/processed_data && chown -R app:app /app/processed_data
-
-# Copy and set up the entrypoint script --- Required to set permissions for data volume mount
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# Create the directory for ChromaDB. The 'app' user will have permissions
+# because it will own the parent directory '/app'.
+RUN mkdir -p /app/processed_data
 
 # Expose the API port
 EXPOSE 8000
 
 # Switch to non-root user
-# USER app
-# The entrypoint will start as root and then switch to the 'app' user.
-
-# Set the entrypoint script to be the main executable
-ENTRYPOINT ["entrypoint.sh"]
+USER app
 
 # Use gunicorn with uvicorn workers for production-grade serving
-CMD ["gunicorn", "backend.main:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "1", "-b", "0.0.0.0:8000"] 
+CMD ["gunicorn", "backend.main:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "1", "-b", "0.0.0.0:8000"]
