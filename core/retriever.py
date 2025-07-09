@@ -183,13 +183,27 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
         Settings.tokenizer = tokenizer
 
     setup_time = time.time()
+
+    print(f"loading vector store from {PROCESSED_DATA_PATH}")
     
     chroma_path = Path(PROCESSED_DATA_PATH) / 'chromadb'
     chroma_path = chroma_path.as_posix()
     chroma_colection_name = config['chroma_collection']
     # db = chromadb.HttpClient(port=8001)
-    db = chromadb.PersistentClient(path=chroma_path)
-    chroma_collection = db.get_collection(chroma_colection_name)
+    try:
+        db = chromadb.PersistentClient(path=chroma_path)
+        print('chroma client created')
+    except Exception as e:
+        print(f"Error creating chroma client: {e}")
+        raise e
+    
+    try:
+        chroma_collection = db.get_collection(chroma_colection_name)
+        print('chroma collection loaded')
+    except Exception as e:
+        print(f"Error loading chroma collection: {e}")
+        raise e
+    
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     print('Vector store loaded. total node count:', chroma_collection.count())
     
