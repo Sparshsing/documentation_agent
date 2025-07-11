@@ -166,6 +166,25 @@ def initialize_langfuse():
 async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_graph=False, config=None):
     # modes: vector, keyword, hybrid (default)
     
+    print('retrieve_nodes is runnig')
+    print("current directory", os.getcwd())
+    # check if we are able to write to files inside PROCESSED_DATA_PATH
+    test_file = Path(PROCESSED_DATA_PATH) / 'test.txt'
+    try:
+        with open(test_file, 'w') as f:
+            f.write('test')
+        print('test file written')
+    except Exception as e:
+        print(f"Error writing to test file: {e}")
+
+    test_file_chromadb = Path(PROCESSED_DATA_PATH) / 'chromadb/test.txt'
+    try:
+        with open(test_file_chromadb, 'w') as f:
+            f.write('test')
+        print('test file written to chromadb')
+    except Exception as e:
+        print(f"Error writing to test file in chromadb: {e}")
+
     start_time = time.time()
     print(f"Starting retrieve_nodes for query: {query[:50]}...")
 
