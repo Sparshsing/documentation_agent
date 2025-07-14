@@ -3,6 +3,9 @@ __pycache__/
 .mypy_cache/
 *.code-workspace
 data/
+processed_data/
+old_data/
+old_processed_data/
 logs/
 temp_files/
 *.md

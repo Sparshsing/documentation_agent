@@ -60,45 +60,40 @@ GRAPH_AVAILABLE = False
 
 
 def verify_config(config):
-    fields_to_verify = ['llm_model_provider', 'vector_store', 'chromadb_path', 'chroma_collection', 'embedding_provider', 'embedding_model', 'tokenizer_provider', 'tokenizer_model_name']
-    if type(config) != list:
-        config = [config]
+    """
+    Verifies that the crucial fields in the config are present.
+    """
+    fields_to_verify = [
+        'index_name', 'input_dir', 'output_dir', 'vector_store', 
+        'chromadb_path', 'chroma_collection', 'doctsore_path', 
+        'embedding_provider', 'embedding_model', 'tokenizer_provider', 
+        'tokenizer_model_name', 'metadata_extractors', 'runs'
+    ]
     
-    # Verify each field has consistent values across all configs
     for field in fields_to_verify:
-        if field not in config[0]:
-            print(f"Field {field} not found in config")
+        if field not in config:
+            print(f"Field '{field}' not found in config")
             return False
             
-        first_value = config[0][field]
-        mismatches = []
-        
-        for i, cfg in enumerate(config[1:], 1):
-            if field not in cfg:
-                mismatches.append(f"Config {i}: Field missing")
-            elif cfg[field] != first_value:
-                mismatches.append(f"Config {i}: {cfg[field]}")
-                
-        if mismatches:
-            print("Config values are not consistent across all configs")
-            print(f"\nMismatch found in {field}:")
-            print(f"First value: {first_value}")
-            # for mismatch in mismatches:
-            #     print(mismatch)
-            return False
+    if not isinstance(config['runs'], list):
+        print("Field 'runs' is not a list.")
+        return False
+
     return True
 
 
 def get_config(index):
     # load config file from processed dir
     config_file = Path(PROCESSED_DATA_PATH) / index / 'config.json'
+    if not config_file.exists():
+        raise FileNotFoundError(f"Configuration file not found at {config_file}")
+
     with open(config_file, 'r') as f:
         config = json.load(f)
+    
     if not verify_config(config):
         raise ValueError("Config is not valid")
-    else:
-        if type(config) == list:
-            config = config[-1]
+    
     return config
 
 

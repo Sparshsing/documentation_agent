@@ -46,9 +46,12 @@ from custom_components.custom_google_genai import CustomGoogleGenAI
 
 load_dotenv()
 
+# Prerequisites:
+# 1. Create a .env file with keys, eg. GEMINI_API_KEY, COHERE_API_KEY, PINECONE_API_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_HOST etc.
+
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
-TOGETHER_API_KEY = os.environ.get('TOGETHER_API_KEY', '')
+PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', '')
 
 # sample data - https://www.gutenberg.org/cache/epub/24022/pg24022.txt
 # sample data: 'https://raw.githubusercontent.com/run-llama/llama_index/main/docs/docs/examples/data/paul_graham/paul_graham_essay.txt'
@@ -102,23 +105,24 @@ CONFIG_PATH = (Path(OUTPUT_DIR) / 'config.json').as_posix()
 EXCLUDE_FILES = ['__all_docs__.md']  # files/folders to exclude. eg ['file.txt', 'folder1/', 'folder2/b.txt', 'folder2/folder3/']
 SKIP_LARGE_FILES = True
 
-def load_existing_configs(config_path):
-    """Load existing configs from the config file, handling errors gracefully."""
+def load_or_initialize_config(config_path, initial_config, logger):
+    """
+    Loads configuration from config_path. If it doesn't exist or is empty, initializes a new one.
+    This function expects the new single-object config format.
+    """
     if os.path.exists(config_path):
         try:
             with open(config_path, 'r') as fp:
                 content = fp.read()
-                if content.strip():  # Ensure file is not empty
-                    configs = json.loads(content)  # Changed from json.load(fp)
-                    if not isinstance(configs, list):  # If existing config is not a list, wrap it in a list
-                        logger.warning(f"Existing config in {config_path} is not a list. Wrapping it in a list.")
-                        configs = [configs]
-                    return configs
-        except json.JSONDecodeError:
-            raise Exception(f"Could not decode JSON from {config_path}. Starting with an empty config list.")
-        except Exception as e:
-            raise Exception(f"An unexpected error occurred while reading {config_path}: {e}. Starting with an empty config list.")
-    return []
+                if content.strip():
+                    return json.loads(content)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error(f"Error reading config file {config_path}: {e}. A new config will be created.")
+    
+    # If file doesn't exist, is empty, or fails to load, create a new one.
+    config = initial_config.copy()
+    config["runs"] = []
+    return config
 
 
 # Find and exclude large files over 20KB if enabled
@@ -367,17 +371,21 @@ def setup_application_logging(output_dir):
     return logger
 
 
-async def create_vector_store(config):
+async def create_vector_store(config_params):
     
-    # check if embedding model is consistent if config exists (in case of rerun)
-    existing_configs = load_existing_configs(CONFIG_PATH)
-    if len(existing_configs) > 0:
-        if existing_configs[-1]['embedding_model'] != EMBEDDING_MODEL:
-            raise Exception(f"Embedding model mismatch: Current model '{EMBEDDING_MODEL}' differs from last run's model '{existing_configs[-1]['embedding_model']}'. Using different embedding models will make vector store incompatible.")
-
-
     # Setup logging
     logger = setup_application_logging(OUTPUT_DIR)
+    
+    # load or initialize config
+    config = load_or_initialize_config(CONFIG_PATH, config_params, logger)
+    
+    # check if embedding model is consistent if config exists (in case of rerun)
+    if config.get('runs'):
+        if config.get('embedding_model') != config_params.get('embedding_model'):
+            raise Exception(f"Embedding model mismatch: Current model '{config_params.get('embedding_model')}' \
+                            differs from existing config's model '{config.get('embedding_model')}'. \
+                                Using different embedding models will make vector store incompatible.")
+
     llm_logger = create_custom_logger('LLMlogger', (Path(OUTPUT_DIR) / "llm_events.log").as_posix())
     setup_llm_logs(llm_logger, Settings, show_text=False, short_inputs=False, short_outputs=False)
 
@@ -412,9 +420,9 @@ async def create_vector_store(config):
 
     # storage_context = StorageContext.from_defaults(vector_store=vector_store, docstore=docstore)
     
-    llm = get_llm(config)
-    embed_model = get_embed_model(config)
-    tokenizer = get_tokenizer(config, llm)
+    llm = get_llm(config_params)
+    embed_model = get_embed_model(config_params)
+    tokenizer = get_tokenizer(config_params, llm)
 
     Settings.llm = llm
     Settings.embed_model = embed_model
@@ -422,7 +430,7 @@ async def create_vector_store(config):
 
     # tokenizer = GeminiTokenizer()
     # Settings.tokenizer = tokenizer
-    max_tokens = config['max_node_tokens']
+    max_tokens = config_params['max_node_tokens']
 
     # Step 1: load Documents
     files_to_exlude = get_large_files_to_exclude(EXCLUDE_FILES)
@@ -482,10 +490,11 @@ async def create_vector_store(config):
 
             logger.info(f"processing {len(nodes)} nodes")
             # Step 3: extract metadata and embeddings for nodes
-            nodes = await process_nodes_with_ratelimit(nodes=nodes, transformations=transformations, run_parallel=RUN_PARALLEL, rate_limit = RATE_LIMIT, logger=logger)
+            nodes = await process_nodes_with_ratelimit(nodes=nodes, transformations=transformations, run_parallel=RUN_PARALLEL, rate_limit = config_params['rate_limit'], logger=logger)
             
             if nodes is None or len(nodes) == 0:
-                raise Exception('Error processing nodes. Aborting.')
+                logger.info('No new nodes to process. Skipping.')
+                continue
 
             # Step 4: Save the Nodes/Chunks in vector store
             total_tokens = sum([len(Settings.tokenizer(node.get_content(metadata_mode=MetadataMode.EMBED))) for node in nodes])
@@ -506,17 +515,24 @@ async def create_vector_store(config):
         
         
         # Check if config file exists and read existing config
-        all_configs = existing_configs
-        
-        current_run_config = config.copy() # Use a copy to avoid modifying the original config dict for the current run
-        current_run_config['run_time'] = datetime.now(timezone.utc).isoformat()
-        current_run_config['run_nodes'] = len(all_nodes) if 'all_nodes' in locals() else 0 # ensure all_nodes exists
-        current_run_config['run_docs'] = list(set([node.ref_doc_id for node in all_nodes]))
-        
-        all_configs.append(current_run_config)
+        run_nodes_count = len(all_nodes) if 'all_nodes' in locals() else 0
+        if run_nodes_count > 0:
+            current_run_info = {
+                'start_time': config_params['datetime'],
+                'end_time': datetime.now(timezone.utc).isoformat(),
+                'run_nodes': run_nodes_count,
+                'node_ids': [node.node_id for node in all_nodes],
+                'processed_doc_ids': list(set([node.ref_doc_id for node in all_nodes])),
+                'llm_model_provider': config_params['llm_model_provider'],
+                'llm_model': config_params['llm_model'],
+                'rate_limit': config_params['rate_limit'],
+                'max_node_tokens': config_params['max_node_tokens'],
+                'file_types': config_params['file_types'],
+            }
+            config['runs'].append(current_run_info)
 
         with open(CONFIG_PATH, 'w') as fp:
-            json.dump(all_configs, fp, indent=4)
+            json.dump(config, fp, indent=4, ensure_ascii=False)
         
         if 'process' in locals() and process.poll() is None: # Check if process exists and is running
             process.terminate()
