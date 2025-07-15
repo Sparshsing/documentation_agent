@@ -793,6 +793,7 @@ dependencies = [
     { name = "llama-index-retrievers-bm25" },
     { name = "llama-index-vector-stores-chroma" },
     { name = "llama-index-vector-stores-neo4jvector" },
+    { name = "llama-index-vector-stores-pinecone" },
     { name = "nbconvert" },
     { name = "nest-asyncio" },
     { name = "openinference-instrumentation-llama-index" },
@@ -824,6 +825,7 @@ requires-dist = [
     { name = "llama-index-retrievers-bm25", specifier = "==0.5.2" },
     { name = "llama-index-vector-stores-chroma", specifier = "==0.4.2" },
     { name = "llama-index-vector-stores-neo4jvector", specifier = "==0.3.0" },
+    { name = "llama-index-vector-stores-pinecone", specifier = "==0.6.0" },
     { name = "nbconvert", specifier = "==7.16.6" },
     { name = "nest-asyncio", specifier = "==1.6.0" },
     { name = "openinference-instrumentation-llama-index", specifier = "==4.3.1" },
@@ -2127,6 +2129,19 @@ wheels = [
 ]
 
 [[package]]
+name = "llama-index-vector-stores-pinecone"
+version = "0.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "llama-index-core" },
+    { name = "pinecone" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/75/79/d74704802fe952b1659a90aa3acba49e248ce8c10ebd4282325519429cf3/llama_index_vector_stores_pinecone-0.6.0.tar.gz", hash = "sha256:a64ba23146e60ea97d188c3d05e9d8d608f301d9a5bf2d4673aeff2b559c9c7b", size = 7852 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0f/5c/01b686b2c2ad56927077407325af4e7bcc2b937ee30b46fbc7940bfab8f1/llama_index_vector_stores_pinecone-0.6.0-py3-none-any.whl", hash = "sha256:5559029119baf92b28d996b0e9579fe086a2a28f2e422bd0693b433f32870712", size = 8041 },
+]
+
+[[package]]
 name = "llama-index-workflows"
 version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3125,6 +3140,45 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/f9/cfaa5082ca9bc4a6de66ffe1c12c2d90bf09c309a5f52b27759a596900e7/pillow-10.4.0-cp313-cp313-win32.whl", hash = "sha256:551d3fd6e9dc15e4c1eb6fc4ba2b39c0c7933fa113b220057a34f4bb3268a060", size = 2235603 },
     { url = "https://files.pythonhosted.org/packages/01/6a/30ff0eef6e0c0e71e55ded56a38d4859bf9d3634a94a88743897b5f96936/pillow-10.4.0-cp313-cp313-win_amd64.whl", hash = "sha256:030abdbe43ee02e0de642aee345efa443740aa4d828bfe8e2eb11922ea6a21ea", size = 2554972 },
     { url = "https://files.pythonhosted.org/packages/48/2c/2e0a52890f269435eee38b21c8218e102c621fe8d8df8b9dd06fabf879ba/pillow-10.4.0-cp313-cp313-win_arm64.whl", hash = "sha256:5b001114dd152cfd6b23befeb28d7aee43553e2402c9f159807bf55f33af8a8d", size = 2243375 },
+]
+
+[[package]]
+name = "pinecone"
+version = "7.3.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "certifi" },
+    { name = "pinecone-plugin-assistant" },
+    { name = "pinecone-plugin-interface" },
+    { name = "python-dateutil" },
+    { name = "typing-extensions" },
+    { name = "urllib3", marker = "python_full_version < '4.0'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fa/38/12731d4af470851b4963eba616605868a8599ef4df51c7b6c928e5f3166d/pinecone-7.3.0.tar.gz", hash = "sha256:307edc155621d487c20dc71b76c3ad5d6f799569ba42064190d03917954f9a7b", size = 235256 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b7/a6/c5d54a5fb1de3983a8739c1a1660e7a7074db2cbadfa875b823fcf29b629/pinecone-7.3.0-py3-none-any.whl", hash = "sha256:315b8fef20320bef723ecbb695dec0aafa75d8434d86e01e5a0e85933e1009a8", size = 587563 },
+]
+
+[[package]]
+name = "pinecone-plugin-assistant"
+version = "1.7.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fa/8c/2db25e4d88ec31cc096b71473938e9269459eb567b50ea49dbea9a88f3ab/pinecone_plugin_assistant-1.7.0.tar.gz", hash = "sha256:e26e3ba10a8b71c3da0d777cff407668022e82963c4913d0ffeb6c552721e482", size = 145608 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/91/29/9aab5e3e22086da8ba40fa9cd34bfefffd9cdf3f43f237fd7c9969568f20/pinecone_plugin_assistant-1.7.0-py3-none-any.whl", hash = "sha256:864cb8e7930588e6c2da97c6d44f0240969195f43fa303c5db76cbc12bf903a5", size = 239972 },
+]
+
+[[package]]
+name = "pinecone-plugin-interface"
+version = "0.0.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f4/fb/e8a4063264953ead9e2b24d9b390152c60f042c951c47f4592e9996e57ff/pinecone_plugin_interface-0.0.7.tar.gz", hash = "sha256:b8e6675e41847333aa13923cc44daa3f85676d7157324682dc1640588a982846", size = 3370 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3b/1d/a21fdfcd6d022cb64cef5c2a29ee6691c6c103c4566b41646b080b7536a5/pinecone_plugin_interface-0.0.7-py3-none-any.whl", hash = "sha256:875857ad9c9fc8bbc074dbe780d187a2afd21f5bfe0f3b08601924a61ef1bba8", size = 6249 },
 ]
 
 [[package]]

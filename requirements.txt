@@ -61,6 +61,7 @@ certifi==2025.6.15
     #   httpcore
     #   httpx
     #   kubernetes
+    #   pinecone
     #   requests
 cffi==1.17.1
     # via cryptography
@@ -348,6 +349,7 @@ llama-index-core==0.12.45
     #   llama-index-retrievers-bm25
     #   llama-index-vector-stores-chroma
     #   llama-index-vector-stores-neo4jvector
+    #   llama-index-vector-stores-pinecone
 llama-index-embeddings-google-genai==0.2.0
     # via documentation-agent (pyproject.toml)
 llama-index-embeddings-huggingface==0.5.5
@@ -379,6 +381,8 @@ llama-index-retrievers-bm25==0.5.2
 llama-index-vector-stores-chroma==0.4.2
     # via documentation-agent (pyproject.toml)
 llama-index-vector-stores-neo4jvector==0.3.0
+    # via documentation-agent (pyproject.toml)
+llama-index-vector-stores-pinecone==0.6.0
     # via documentation-agent (pyproject.toml)
 llama-index-workflows==1.0.1
     # via llama-index-core
@@ -528,6 +532,7 @@ packaging==24.2
     #   nbconvert
     #   onnxruntime
     #   opentelemetry-instrumentation
+    #   pinecone-plugin-assistant
     #   transformers
 pandocfilters==1.5.1
     # via nbconvert
@@ -539,6 +544,12 @@ pillow==10.4.0
     #   llama-index-core
     #   llama-index-llms-google-genai
     #   sentence-transformers
+pinecone==7.3.0
+    # via llama-index-vector-stores-pinecone
+pinecone-plugin-assistant==1.7.0
+    # via pinecone
+pinecone-plugin-interface==0.0.7
+    # via pinecone
 platformdirs==4.3.8
     # via
     #   banks
@@ -638,6 +649,7 @@ python-dateutil==2.9.0.post0
     # via
     #   jupyter-client
     #   kubernetes
+    #   pinecone
     #   posthog
 python-dotenv==1.1.1
     # via
@@ -689,6 +701,7 @@ requests==2.32.4
     #   langsmith
     #   llama-index-core
     #   opentelemetry-exporter-otlp-proto-http
+    #   pinecone-plugin-assistant
     #   posthog
     #   requests-oauthlib
     #   requests-toolbelt
@@ -836,6 +849,7 @@ typing-extensions==4.14.0
     #   opentelemetry-exporter-otlp-proto-http
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
+    #   pinecone
     #   posthog
     #   pydantic
     #   pydantic-core
@@ -862,6 +876,7 @@ uritemplate==4.2.0
 urllib3==2.5.0
     # via
     #   kubernetes
+    #   pinecone
     #   requests
     #   types-requests
 uvicorn==0.35.0
