@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 import tiktoken
 import chromadb
+import Stemmer
 
 from langfuse import get_client
 from openinference.instrumentation.llama_index import LlamaIndexInstrumentor
@@ -29,6 +30,8 @@ from llama_index.core.retrievers import QueryFusionRetriever
 from llama_index.core.response_synthesizers import get_response_synthesizer
 from llama_index.core.response_synthesizers.type import ResponseMode
 from llama_index.core.schema import NodeWithScore, QueryBundle, QueryType
+from llama_index.vector_stores.pinecone import PineconeVectorStore
+from pinecone import Pinecone
 
 # import custom components
 sys.path.append(str(Path(__file__).parent.absolute()))  # add the parent directory to the path
@@ -51,10 +54,13 @@ PROCESSED_DATA_PATH = os.environ.get('PROCESSED_DATA_PATH', 'processed_data')
 LLM_MODEL_PROVIDER = 'litellm'  # choose from ['litellm', 'ollama', 'gemini', 'groq']
 LLM_MODEL = "gemini/gemini-2.5-flash" # "cerebras/llama-3.3-70b"  #  # "together_ai/meta-llama/Llama-3.3-70B-Instruct-Turbo" # "cerebras/llama-3.3-70b"  # "groq/llama-3.3-70b-versatile"  # "cerebras/llama-3.3-70b"
 USE_DEFAULT_TOKENIZER = True
+RETRIEVER_VECTOR_STORE = os.environ.get('RETRIEVER_VECTOR_STORE', 'chromadb')
+PINECONE_INDEX_NAME = 'documentation-agent'
 
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
 COHERE_API_KEY = os.environ.get('COHERE_API_KEY', '')
+PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY', '')
 
 GRAPH_AVAILABLE = False
 
@@ -65,7 +71,7 @@ def verify_config(config):
     """
     fields_to_verify = [
         'index_name', 'input_dir', 'output_dir', 'vector_store', 
-        'chromadb_path', 'chroma_collection', 'doctsore_path', 
+        'chromadb_path', 'chroma_collection', 'docstore_path', 
         'embedding_provider', 'embedding_model', 'tokenizer_provider', 
         'tokenizer_model_name', 'metadata_extractors', 'runs'
     ]
@@ -163,22 +169,23 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
     
     print('retrieve_nodes is runnig')
     print("current directory", os.getcwd())
-    # check if we are able to write to files inside PROCESSED_DATA_PATH
-    test_file = Path(PROCESSED_DATA_PATH) / 'test.txt'
-    try:
-        with open(test_file, 'w') as f:
-            f.write('test')
-        print('test file written')
-    except Exception as e:
-        print(f"Error writing to test file: {e}")
 
-    test_file_chromadb = Path(PROCESSED_DATA_PATH) / 'chromadb/test.txt'
-    try:
-        with open(test_file_chromadb, 'w') as f:
-            f.write('test')
-        print('test file written to chromadb')
-    except Exception as e:
-        print(f"Error writing to test file in chromadb: {e}")
+    # # check if we are able to write to files inside PROCESSED_DATA_PATH
+    # test_file = Path(PROCESSED_DATA_PATH) / 'test.txt'
+    # try:
+    #     with open(test_file, 'w') as f:
+    #         f.write('test')
+    #     print('test file written')
+    # except Exception as e:
+    #     print(f"Error writing to test file: {e}")
+
+    # test_file_chromadb = Path(PROCESSED_DATA_PATH) / 'chromadb/test.txt'
+    # try:
+    #     with open(test_file_chromadb, 'w') as f:
+    #         f.write('test')
+    #     print('test file written to chromadb')
+    # except Exception as e:
+    #     print(f"Error writing to test file in chromadb: {e}")
 
     start_time = time.time()
     print(f"Starting retrieve_nodes for query: {query[:50]}...")
@@ -187,41 +194,11 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
         config = get_config(index)
     
     llm = get_llm(llm_model_provider=LLM_MODEL_PROVIDER, llm_model=LLM_MODEL)
-    embed_model = get_embed_model(config['embedding_provider'], config['embedding_model'])
-
     Settings.llm = llm
-    Settings.embed_model = embed_model
     
     if not USE_DEFAULT_TOKENIZER:
         tokenizer = get_tokenizer(config['tokenizer_provider'], config['tokenizer_model_name'], llm)
         Settings.tokenizer = tokenizer
-
-    setup_time = time.time()
-
-    print(f"loading vector store from {PROCESSED_DATA_PATH}")
-    
-    chroma_path = Path(PROCESSED_DATA_PATH) / 'chromadb'
-    chroma_path = chroma_path.as_posix()
-    chroma_colection_name = config['chroma_collection']
-    # db = chromadb.HttpClient(port=8001)
-    try:
-        db = chromadb.PersistentClient(path=chroma_path)
-        print('chroma client created')
-    except Exception as e:
-        print(f"Error creating chroma client: {e}")
-        raise e
-    
-    try:
-        chroma_collection = db.get_collection(chroma_colection_name)
-        print('chroma collection loaded')
-    except Exception as e:
-        print(f"Error loading chroma collection: {e}")
-        raise e
-    
-    vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
-    print('Vector store loaded. total node count:', chroma_collection.count())
-    
-    vector_store_time = time.time()
     
     if use_graph and not GRAPH_AVAILABLE:
         raise ValueError('Graph not available. Using vector index/keyword index.')
@@ -231,30 +208,66 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
     
     # retrieve more initial nodes in case of rerank
     similarity_top_k = top_k*2 if rerank else top_k
-    
-    if mode == 'vector':
-        vector_index = VectorStoreIndex.from_vector_store(
-            vector_store,
-            embed_model=embed_model,
-        )
-        retriever = vector_index.as_retriever(similarity_top_k=similarity_top_k)
-    
-    elif mode == 'keyword':
-        nodes_info = chroma_collection.get()
-        all_nodes = await vector_store.aget_nodes(nodes_info['ids'])
-        retriever = BM25Retriever.from_defaults(nodes=all_nodes, similarity_top_k=similarity_top_k)
-        
-    elif mode == 'hybrid':
-        vector_index = VectorStoreIndex.from_vector_store(
-            vector_store,
-            embed_model=embed_model,
-        )
-        vector_retriever = vector_index.as_retriever(similarity_top_k=similarity_top_k)
-        
-        nodes_info = chroma_collection.get()
-        all_nodes = await vector_store.aget_nodes(nodes_info['ids'])
-        keyword_retriever = BM25Retriever.from_defaults(nodes=all_nodes, similarity_top_k=similarity_top_k)
 
+    setup_time = time.time()
+
+    # load the index
+    if mode in ('vector', 'hybrid'):
+        if RETRIEVER_VECTOR_STORE == 'pinecone':
+            print('loading pinecone index')
+            pc = Pinecone(api_key=PINECONE_API_KEY)
+            pinecone_index = pc.Index(name=PINECONE_INDEX_NAME)
+            vector_store = PineconeVectorStore(pinecone_index=pinecone_index, namespace=config['chroma_collection'])
+            embed_model = get_embed_model(config['embedding_provider'], config['embedding_model'])
+            Settings.embed_model = embed_model
+            vector_index = VectorStoreIndex.from_vector_store(
+                        vector_store,
+                        embed_model=embed_model,
+                    )
+        elif RETRIEVER_VECTOR_STORE == 'chromadb':
+            print('loading chroma index')
+            chroma_path = Path(PROCESSED_DATA_PATH) / 'chromadb'
+            chroma_path = chroma_path.as_posix()
+            chroma_colection_name = config['chroma_collection']
+            # chroma_client = chromadb.HttpClient(port=8001)
+            try:
+                chroma_client = chromadb.PersistentClient(path=chroma_path)
+                print('chroma client created')
+            except Exception as e:
+                print(f"Error creating chroma client: {e}")
+                raise e
+            
+            try:
+                chroma_collection = chroma_client.get_collection(chroma_colection_name)
+                print('chroma collection loaded')
+            except Exception as e:
+                print(f"Error loading chroma collection: {e}")
+                raise e
+            vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
+            embed_model = get_embed_model(config['embedding_provider'], config['embedding_model'])
+            Settings.embed_model = embed_model
+            vector_index = VectorStoreIndex.from_vector_store(
+                        vector_store,
+                        embed_model=embed_model,
+                    )
+        else:
+            raise ValueError(f"Vector store {RETRIEVER_VECTOR_STORE} not supported. Please choose from ['chromadb', 'pinecone']")
+
+    print('index loaded')
+    index_creation_time = time.time()
+
+    # get the retriever
+    if mode == 'vector':
+        retriever = vector_index.as_retriever(similarity_top_k=similarity_top_k)
+    elif mode == 'keyword':
+        loaded_docstore =SimpleDocumentStore.from_persist_path(config['docstore_path'])
+        docstore_nodes = list(loaded_docstore.docs.values())
+        retriever = BM25Retriever.from_defaults(nodes=docstore_nodes, similarity_top_k=similarity_top_k, stemmer=Stemmer.Stemmer("english"), language="english")
+    elif mode == 'hybrid':
+        vector_retriever = vector_index.as_retriever(similarity_top_k=similarity_top_k)
+        loaded_docstore =SimpleDocumentStore.from_persist_path(config['docstore_path'])
+        docstore_nodes = list(loaded_docstore.docs.values())
+        keyword_retriever = BM25Retriever.from_defaults(nodes=docstore_nodes, similarity_top_k=similarity_top_k, stemmer=Stemmer.Stemmer("english"), language="english")
         retriever = QueryFusionRetriever(
             retrievers=[vector_retriever, keyword_retriever],
             num_queries=4,
@@ -264,6 +277,8 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
             mode = "dist_based_score",
             use_async=True,
         )
+    else:
+        raise ValueError(f"Mode {mode} not supported")
 
     retriever_setup_time = time.time()
 
@@ -289,8 +304,8 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
     # Print timing breakdown
     print(f"\n=== TIMING BREAKDOWN ===")
     print(f"Setup (LLM, embeddings, settings): {setup_time - start_time:.3f}s")
-    print(f"Vector store loading: {vector_store_time - setup_time:.3f}s")
-    print(f"Retriever setup ({mode} mode): {retriever_setup_time - vector_store_time:.3f}s")
+    print(f"Index loading: {index_creation_time - setup_time:.3f}s")
+    print(f"Retriever setup ({mode} mode): {retriever_setup_time - index_creation_time:.3f}s")
     print(f"Node retrieval: {retrieval_time - retriever_setup_time:.3f}s")
     if rerank:
         print(f"Reranking: {rerank_time - retrieval_time:.3f}s")

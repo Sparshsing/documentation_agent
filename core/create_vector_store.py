@@ -47,7 +47,7 @@ from custom_components.custom_google_genai import CustomGoogleGenAI
 load_dotenv()
 
 # Prerequisites:
-# 1. Create a .env file with keys, eg. GEMINI_API_KEY, COHERE_API_KEY, PINECONE_API_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_HOST etc.
+# 1. Create a .env file with keys, eg. GEMINI_API_KEY, COHERE_API_KEY, PINECONE_API_KEY, LANGFUSE_SECRET_KEY, LANGFUSE_PUBLIC_KEY, LANGFUSE_HOST, RETRIEVER_VECTOR_STORE etc.
 
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GROQ_API_KEY = os.environ.get('GROQ_API_KEY', '')
@@ -412,11 +412,11 @@ async def create_vector_store(config_params):
     vector_store = ChromaVectorStore(chroma_collection=chroma_collection)
     
     # Initialize stores
-    # if Path(DOCSTORE_PATH).exists():
-    #     docstore = SimpleDocumentStore.from_persist_path(DOCSTORE_PATH)
-    #     logger.info(f"Loaded existing docstore with {len(docstore.docs)} documents")
-    # else:
-    #     docstore = SimpleDocumentStore()
+    if Path(DOCSTORE_PATH).exists():
+        docstore = SimpleDocumentStore.from_persist_path(DOCSTORE_PATH)
+        logger.info(f"Loaded existing docstore with {len(docstore.docs)} documents")
+    else:
+        docstore = SimpleDocumentStore()
 
     # storage_context = StorageContext.from_defaults(vector_store=vector_store, docstore=docstore)
     
@@ -450,9 +450,7 @@ async def create_vector_store(config_params):
     processed_node_ids = set(chroma_collection.get(include=[])['ids'])
     print(f"{len(processed_node_ids)} nodes already processed")
 
-
-    ## ! Important. #todo
-    # Implement Logic to split markdown nodes further since Chunk size not followed by MarkdownNode parse
+    # Main logic to process documents and create nodes
     try:
         doc_batch_size = 1
         all_nodes = []
@@ -497,10 +495,16 @@ async def create_vector_store(config_params):
                 continue
 
             # Step 4: Save the Nodes/Chunks in vector store
-            total_tokens = sum([len(Settings.tokenizer(node.get_content(metadata_mode=MetadataMode.EMBED))) for node in nodes])
             node_ids = await vector_store.async_add(nodes)
-            # docstore.add_documents(nodes)
-            # docstore.persist(DOCSTORE_PATH)
+            
+            # add nodes to docstore - except embedding
+            docstore_nodes = [node.model_copy(deep=True) for node in nodes]
+            for node in docstore_nodes:
+                node.embedding = None
+            docstore.add_documents(docstore_nodes)
+            docstore.persist(DOCSTORE_PATH)
+
+            total_tokens = sum([len(Settings.tokenizer(node.get_content(metadata_mode=MetadataMode.EMBED))) for node in nodes])
             logger.info(f"added {len(nodes)} to vector store. Total tokens = {total_tokens}")
             all_nodes.extend(nodes)
             t_end = time.time()
@@ -508,11 +512,6 @@ async def create_vector_store(config_params):
             # time.sleep(1)
 
     finally:
-        
-        # Persist the docstore
-        # docstore.persist(DOCSTORE_PATH)
-        # logger.info(f"saving doctore to {DOCSTORE_PATH}")
-        
         
         # Check if config file exists and read existing config
         run_nodes_count = len(all_nodes) if 'all_nodes' in locals() else 0
@@ -557,7 +556,7 @@ def main():
         'vector_store': 'chroma',
         'chromadb_path': CHROMADB_PATH,
         'chroma_collection': CHROMADB_COLLECTION,
-        'doctsore_path': DOCSTORE_PATH,
+        'docstore_path': DOCSTORE_PATH,
         'embedding_provider': EMBEDDING_PROVIDER,
         'embedding_model': EMBEDDING_MODEL,
         'tokenizer_provider': TOKENIZER_PROVIDER,
