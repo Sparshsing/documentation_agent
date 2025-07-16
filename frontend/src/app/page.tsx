@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import ThemeToggle from "./components/ThemeToggle";
 
 interface Index {
   name: string;
@@ -14,7 +15,12 @@ interface RetrievedNode {
   node_id: string;
   node_score: number;
   node_text: string;
-  node_metadata: Record<string, any>;
+  node_metadata: Record<string, string | number>;
+}
+
+interface ApiResponse {
+  response: string;
+  sources: RetrievedNode[];
 }
 
 export default function Home() {
@@ -25,7 +31,6 @@ export default function Home() {
   const [sources, setSources] = useState<RetrievedNode[] | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [dark, setDark] = useState<boolean>(false);
   const [includeSources, setIncludeSources] = useState<boolean>(true);
   const [topK, setTopK] = useState<number>(5);
   // Retrieval options
@@ -35,53 +40,6 @@ export default function Home() {
   const selectedIndexObj = indexes.find((idx) => idx.name === selectedIndex);
 
   // const txt = "## ABCD \n second line \n### zxczc \nhello, whats up?"
-//   const txt = `To interact with files in a chat-like manner, you can first upload the file and then include it as part of the content sent to a model for generation.
-
-// Here's a general approach:
-// 1.  Upload the file using a client method like \`client.files.upload()\`. This will provide a reference to the uploaded file.
-// 2.  Use this file reference in the \`contents\` argument when calling a content generation method, such as \`client.models.generate_content_stream()\`, alongside any text prompts.
-
-// For example, to get a summary of a PDF document:
-
-// \`\`\`python
-// from google import genai
-// client = genai.Client()
-
-// # Upload the PDF file
-// sample_pdf = client.files.upload(file="path/to/your/test.pdf")
-
-// # Generate content using the uploaded PDF
-// response = client.models.generate_content_stream(
-//   model="gemini-2.0-flash",
-//   contents=["Give me a summary of this document:", sample_pdf],
-// )
-
-// # Process the streamed response
-// for chunk in response:
-//   print(chunk.text)
-// \`\`\`
-// `;
-const txt = `
-# Python code example
-\`\`\`python
-from google import genai
-client = genai.Client()
-
-# Upload the PDF file
-sample_pdf = client.files.upload(file="path/to/your/test.pdf")
-
-# Generate content using the uploaded PDF
-response = client.models.generate_content_stream(
-  model="gemini-2.0-flash",
-  contents=["Give me a summary of this document:", sample_pdf],
-)
-
-# Process the streamed response
-for chunk in response:
-  print(chunk.text)
-\`\`\`
-`;
-
 
   // Fetch indexes on mount
   useEffect(() => {
@@ -96,11 +54,6 @@ for chunk in response:
         setError("Failed to load indexes");
       });
   }, []);
-
-  // Toggle dark mode on state change
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-  }, [dark]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,36 +82,33 @@ for chunk in response:
 
       if (!res.ok) throw new Error(`API error: ${res.status}`);
 
-      const data = await res.json();
+      const data: ApiResponse = await res.json();
       setResponseText(data.response);
       setSources(data.sources ?? null);
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
-      setError(err.message ?? "Unknown error");
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred");
+      }
     } finally {
       setLoading(false);
     }
   };
-
-
-  // return (
-  //     <div className="markdown">
-  //     <ReactMarkdown>{txt}</ReactMarkdown>
-  //     </div>
-  // )
 
   return (
     <div className="min-h-screen bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 transition-colors px-4 sm:px-8 py-10 flex flex-col">
       {/* Header */}
       <header className="flex items-center justify-between max-w-4xl w-full mx-auto mb-8">
         <h1 className="text-2xl sm:text-3xl font-semibold">Documentation Agent</h1>
-        <button
-          onClick={() => setDark((d) => !d)}
-          className="rounded-md px-3 py-2 border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-sm"
-        >
-          {dark ? "Light Mode" : "Dark Mode"}
-        </button>
+        <ThemeToggle />
       </header>
+
+      {/* Test div to verify dark mode */}
+      {/* <div className="text-orange-500 dark:text-gray-500 mb-4 text-center">
+        This text should be orange in light mode and gray in dark mode
+      </div> */}
 
       {/* Main */}
       <main className="flex-1 w-full max-w-4xl mx-auto flex flex-col gap-6">
@@ -278,7 +228,7 @@ for chunk in response:
           <section className="mt-6">
             <h2 className="text-xl font-semibold mb-2">Sources</h2>
             <ul className="space-y-2">
-              {sources?.map((node, idx) => (
+              {sources.map((node, idx) => (
                 <li
                   key={node.node_id}
                   className="border border-neutral-300 dark:border-neutral-700 rounded-md overflow-hidden text-sm"
