@@ -8,6 +8,7 @@ old_data/
 old_processed_data/
 logs/
 temp_files/
+experiment_notebooks/
 *.md
 !README.md
 !README_DEPLOY.md

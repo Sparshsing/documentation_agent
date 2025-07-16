@@ -127,9 +127,9 @@ def get_llm(llm_model_provider, llm_model):
 
 
 def get_embed_model(embedding_provider, embedding_model):
-    if embedding_provider == 'HuggingFaceEmbedding':
-        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-        return HuggingFaceEmbedding(model_name=embedding_model)
+    if embedding_provider == 'FastEmbedEmbedding':
+        from llama_index.embeddings.fastembed import FastEmbedEmbedding
+        return FastEmbedEmbedding(model_name=embedding_model)
     elif embedding_provider == 'GoogleGenAIEmbedding':
         from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
         return GoogleGenAIEmbedding(model_name=embedding_model, api_key=GEMINI_API_KEY)

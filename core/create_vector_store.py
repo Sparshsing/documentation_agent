@@ -83,7 +83,7 @@ RUN_PARALLEL = False  # process nodes in parallel using async
 # GROQ_MODEL = "llama-3.3-70b-versatile"
 # OLLAMA_MODEL = "llama3.1:8b-instruct-q8_0"
 
-HUGGINGFACE_EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
+FASTEMBED_EMBEDDING_MODEL = "BAAI/bge-base-en-v1.5"
 GEMINI_EMBEDDING_MODEL = "models/text-embedding-004"
 
 TIKTOKEN_TOKENIZER_MODEL = "cl100k_base"
@@ -91,7 +91,7 @@ GEMINI_TOKENIZER_MODEL = LLM_MODEL
 HUGGINGFACE_TOKENIZER_MODEL = "meta-llama/Meta-Llama-3.1-70B-Instruct"
 
 
-EMBEDDING_PROVIDER = 'GoogleGenAIEmbedding'  # choose from ['HuggingFaceEmbedding', 'GoogleGenAIEmbedding', etc]
+EMBEDDING_PROVIDER = 'GoogleGenAIEmbedding'  # choose from ['FastEmbedEmbedding', 'GoogleGenAIEmbedding', etc]
 EMBEDDING_MODEL = GEMINI_EMBEDDING_MODEL
 
 # Only used for token counting, best use tiktoken unless accuracy is needed
@@ -158,9 +158,9 @@ def get_llm(config):
 
 
 def get_embed_model(config):
-    if config['embedding_provider'] == 'HuggingFaceEmbedding':
-        from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-        return HuggingFaceEmbedding(model_name=config['embedding_model'])
+    if config['embedding_provider'] == 'FastEmbedEmbedding':
+        from llama_index.embeddings.fastembed import FastEmbedEmbedding
+        return FastEmbedEmbedding(model_name=config['embedding_model'])
     elif config['embedding_provider'] == 'GoogleGenAIEmbedding':
         from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
         return GoogleGenAIEmbedding(model_name=config['embedding_model'], api_key=GEMINI_API_KEY)

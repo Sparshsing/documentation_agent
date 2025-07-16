@@ -4,14 +4,13 @@ aiofiles==24.1.0
     # via crawl4ai
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.12.13
+aiohttp==3.12.14
     # via
     #   crawl4ai
-    #   huggingface-hub
     #   langchain-community
     #   litellm
     #   llama-index-core
-aiosignal==1.3.2
+aiosignal==1.4.0
     # via aiohttp
 aiosqlite==0.21.0
     # via
@@ -56,7 +55,7 @@ build==1.2.2.post1
     # via chromadb
 cachetools==5.5.2
     # via google-auth
-certifi==2025.6.15
+certifi==2025.7.14
     # via
     #   httpcore
     #   httpx
@@ -69,7 +68,7 @@ chardet==5.2.0
     # via crawl4ai
 charset-normalizer==3.4.2
     # via requests
-chromadb==1.0.13
+chromadb==1.0.15
     # via llama-index-vector-stores-chroma
 click==8.2.1
     # via
@@ -79,7 +78,7 @@ click==8.2.1
     #   rich-toolkit
     #   typer
     #   uvicorn
-cohere==5.15.0
+cohere==5.16.1
     # via llama-index-postprocessor-cohere-rerank
 colorama==0.4.6
     # via
@@ -88,6 +87,7 @@ colorama==0.4.6
     #   crawl4ai
     #   griffe
     #   ipython
+    #   loguru
     #   tqdm
     #   uvicorn
 coloredlogs==15.0.1
@@ -96,7 +96,7 @@ comm==0.2.2
     # via ipykernel
 crawl4ai==0.6.3
     # via documentation-agent (pyproject.toml)
-cryptography==45.0.4
+cryptography==45.0.5
     # via pyopenssl
 cssselect==1.3.0
     # via crawl4ai
@@ -104,7 +104,7 @@ dataclasses-json==0.6.7
     # via
     #   langchain-community
     #   llama-index-core
-debugpy==1.8.14
+debugpy==1.8.15
     # via ipykernel
 decorator==5.2.1
     # via ipython
@@ -140,12 +140,13 @@ fastapi-cli==0.0.7
     # via documentation-agent (pyproject.toml)
 fastavro==1.11.1
     # via cohere
+fastembed==0.7.1
+    # via llama-index-embeddings-fastembed
 fastjsonschema==2.21.1
     # via nbformat
 filelock==3.18.0
     # via
     #   huggingface-hub
-    #   torch
     #   transformers
 filetype==1.2.0
     # via llama-index-core
@@ -155,11 +156,10 @@ frozenlist==1.7.0
     # via
     #   aiohttp
     #   aiosignal
-fsspec==2025.5.1
+fsspec==2025.7.0
     # via
     #   huggingface-hub
     #   llama-index-core
-    #   torch
 google-ai-generativelanguage==0.6.15
     # via google-generativeai
 google-api-core==2.25.1
@@ -167,7 +167,7 @@ google-api-core==2.25.1
     #   google-ai-generativelanguage
     #   google-api-python-client
     #   google-generativeai
-google-api-python-client==2.174.0
+google-api-python-client==2.176.0
     # via google-generativeai
 google-auth==2.40.3
     # via
@@ -180,7 +180,7 @@ google-auth==2.40.3
     #   kubernetes
 google-auth-httplib2==0.2.0
     # via google-api-python-client
-google-genai==1.24.0
+google-genai==1.25.0
     # via
     #   llama-index-embeddings-google-genai
     #   llama-index-llms-google-genai
@@ -198,7 +198,7 @@ greenlet==3.2.3
     #   sqlalchemy
 griffe==1.7.3
     # via banks
-groq==0.29.0
+groq==0.30.0
     # via langchain-groq
 grpcio==1.73.1
     # via
@@ -239,10 +239,9 @@ httpx-sse==0.4.0
     # via
     #   cohere
     #   langchain-community
-huggingface-hub==0.33.2
+huggingface-hub==0.33.4
     # via
-    #   llama-index-embeddings-huggingface
-    #   sentence-transformers
+    #   fastembed
     #   tokenizers
     #   transformers
 humanfriendly==10.0
@@ -275,13 +274,10 @@ jinja2==3.1.6
     #   banks
     #   litellm
     #   nbconvert
-    #   torch
 jiter==0.10.0
     # via openai
 joblib==1.5.1
-    # via
-    #   nltk
-    #   scikit-learn
+    # via nltk
 jsonpatch==1.33
     # via langchain-core
 jsonpointer==3.0.0
@@ -312,7 +308,7 @@ langchain==0.3.26
     # via langchain-community
 langchain-community==0.3.26
     # via documentation-agent (pyproject.toml)
-langchain-core==0.3.67
+langchain-core==0.3.69
     # via
     #   langchain
     #   langchain-community
@@ -324,20 +320,20 @@ langchain-text-splitters==0.3.8
     # via langchain
 langfuse==3.1.0
     # via documentation-agent (pyproject.toml)
-langsmith==0.4.4
+langsmith==0.4.6
     # via
     #   langchain
     #   langchain-community
     #   langchain-core
-litellm==1.73.6
+litellm==1.74.3
     # via
     #   crawl4ai
     #   llama-index-llms-litellm
 llama-index-core==0.12.45
     # via
     #   documentation-agent (pyproject.toml)
+    #   llama-index-embeddings-fastembed
     #   llama-index-embeddings-google-genai
-    #   llama-index-embeddings-huggingface
     #   llama-index-graph-stores-neo4j
     #   llama-index-llms-google-genai
     #   llama-index-llms-groq
@@ -350,9 +346,9 @@ llama-index-core==0.12.45
     #   llama-index-vector-stores-chroma
     #   llama-index-vector-stores-neo4jvector
     #   llama-index-vector-stores-pinecone
-llama-index-embeddings-google-genai==0.2.0
+llama-index-embeddings-fastembed==0.3.5
     # via documentation-agent (pyproject.toml)
-llama-index-embeddings-huggingface==0.5.5
+llama-index-embeddings-google-genai==0.2.0
     # via documentation-agent (pyproject.toml)
 llama-index-graph-stores-neo4j==0.4.6
     # via documentation-agent (pyproject.toml)
@@ -384,8 +380,10 @@ llama-index-vector-stores-neo4jvector==0.3.0
     # via documentation-agent (pyproject.toml)
 llama-index-vector-stores-pinecone==0.6.0
     # via documentation-agent (pyproject.toml)
-llama-index-workflows==1.0.1
+llama-index-workflows==1.1.0
     # via llama-index-core
+loguru==0.7.3
+    # via fastembed
 lxml==5.4.0
     # via crawl4ai
 markdown-it-py==3.0.0
@@ -405,7 +403,9 @@ mdurl==0.1.2
 mistune==3.1.3
     # via nbconvert
 mmh3==5.1.0
-    # via chromadb
+    # via
+    #   chromadb
+    #   fastembed
 mpmath==1.3.0
     # via sympy
 multidict==6.6.3
@@ -432,9 +432,7 @@ nest-asyncio==1.6.0
     #   ipykernel
     #   llama-index-core
 networkx==3.5
-    # via
-    #   llama-index-core
-    #   torch
+    # via llama-index-core
 nltk==3.9.1
     # via
     #   crawl4ai
@@ -444,11 +442,11 @@ numpy==2.3.1
     #   bm25s
     #   chromadb
     #   crawl4ai
+    #   fastembed
     #   langchain-community
     #   llama-index-core
     #   onnxruntime
     #   rank-bm25
-    #   scikit-learn
     #   scipy
     #   transformers
 oauthlib==3.3.1
@@ -457,13 +455,15 @@ oauthlib==3.3.1
     #   requests-oauthlib
 ollama==0.5.1
     # via llama-index-llms-ollama
-onnxruntime==1.22.0
-    # via chromadb
-openai==1.93.0
+onnxruntime==1.22.1
+    # via
+    #   chromadb
+    #   fastembed
+openai==1.96.1
     # via
     #   litellm
     #   llama-index-llms-openai
-openinference-instrumentation==0.1.34
+openinference-instrumentation==0.1.35
     # via openinference-instrumentation-llama-index
 openinference-instrumentation-llama-index==4.3.1
     # via documentation-agent (pyproject.toml)
@@ -471,7 +471,7 @@ openinference-semantic-conventions==0.1.21
     # via
     #   openinference-instrumentation
     #   openinference-instrumentation-llama-index
-opentelemetry-api==1.34.1
+opentelemetry-api==1.35.0
     # via
     #   chromadb
     #   langfuse
@@ -482,38 +482,38 @@ opentelemetry-api==1.34.1
     #   opentelemetry-instrumentation
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-opentelemetry-exporter-otlp==1.34.1
+opentelemetry-exporter-otlp==1.35.0
     # via langfuse
-opentelemetry-exporter-otlp-proto-common==1.34.1
+opentelemetry-exporter-otlp-proto-common==1.35.0
     # via
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-exporter-otlp-proto-grpc==1.34.1
+opentelemetry-exporter-otlp-proto-grpc==1.35.0
     # via
     #   chromadb
     #   opentelemetry-exporter-otlp
-opentelemetry-exporter-otlp-proto-http==1.34.1
+opentelemetry-exporter-otlp-proto-http==1.35.0
     # via opentelemetry-exporter-otlp
-opentelemetry-instrumentation==0.55b1
+opentelemetry-instrumentation==0.56b0
     # via openinference-instrumentation-llama-index
-opentelemetry-proto==1.34.1
+opentelemetry-proto==1.35.0
     # via
     #   opentelemetry-exporter-otlp-proto-common
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-sdk==1.34.1
+opentelemetry-sdk==1.35.0
     # via
     #   chromadb
     #   langfuse
     #   openinference-instrumentation
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
-opentelemetry-semantic-conventions==0.55b1
+opentelemetry-semantic-conventions==0.56b0
     # via
     #   openinference-instrumentation-llama-index
     #   opentelemetry-instrumentation
     #   opentelemetry-sdk
-orjson==3.10.18
+orjson==3.11.0
     # via
     #   chromadb
     #   langsmith
@@ -541,9 +541,9 @@ parso==0.8.4
 pillow==10.4.0
     # via
     #   crawl4ai
+    #   fastembed
     #   llama-index-core
     #   llama-index-llms-google-genai
-    #   sentence-transformers
 pinecone==7.3.0
     # via llama-index-vector-stores-pinecone
 pinecone-plugin-assistant==1.7.0
@@ -558,7 +558,7 @@ playwright==1.53.0
     # via
     #   crawl4ai
     #   tf-playwright-stealth
-posthog==6.0.1
+posthog==5.4.0
     # via chromadb
 prompt-toolkit==3.0.51
     # via ipython
@@ -586,6 +586,8 @@ psutil==7.0.0
     #   ipykernel
 pure-eval==0.2.3
     # via stack-data
+py-rust-stemmers==0.1.5
+    # via fastembed
 pyasn1==0.6.1
     # via
     #   pyasn1-modules
@@ -659,7 +661,7 @@ python-dotenv==1.1.1
     #   uvicorn
 pytz==2025.2
     # via neo4j
-pywin32==310
+pywin32==311
     # via jupyter-core
 pyyaml==6.0.2
     # via
@@ -691,6 +693,7 @@ requests==2.32.4
     # via
     #   cohere
     #   crawl4ai
+    #   fastembed
     #   google-api-core
     #   google-genai
     #   huggingface-hub
@@ -727,15 +730,8 @@ rsa==4.9.1
     # via google-auth
 safetensors==0.5.3
     # via transformers
-scikit-learn==1.7.0
-    # via sentence-transformers
 scipy==1.16.0
-    # via
-    #   bm25s
-    #   scikit-learn
-    #   sentence-transformers
-sentence-transformers==5.0.0
-    # via llama-index-embeddings-huggingface
+    # via bm25s
 setuptools==80.9.0
     # via llama-index-core
 shellingham==1.5.4
@@ -764,9 +760,7 @@ stack-data==0.6.3
 starlette==0.46.2
     # via fastapi
 sympy==1.14.0
-    # via
-    #   onnxruntime
-    #   torch
+    # via onnxruntime
 tenacity==8.5.0
     # via
     #   chromadb
@@ -776,8 +770,6 @@ tenacity==8.5.0
     #   llama-index-core
 tf-playwright-stealth==1.2.0
     # via crawl4ai
-threadpoolctl==3.6.0
-    # via scikit-learn
 tiktoken==0.9.0
     # via
     #   litellm
@@ -788,10 +780,9 @@ tokenizers==0.21.2
     # via
     #   chromadb
     #   cohere
+    #   fastembed
     #   litellm
     #   transformers
-torch==2.7.1
-    # via sentence-transformers
 tornado==6.5.1
     # via
     #   ipykernel
@@ -799,12 +790,12 @@ tornado==6.5.1
 tqdm==4.67.1
     # via
     #   chromadb
+    #   fastembed
     #   google-generativeai
     #   huggingface-hub
     #   llama-index-core
     #   nltk
     #   openai
-    #   sentence-transformers
     #   transformers
 traitlets==5.14.3
     # via
@@ -817,18 +808,17 @@ traitlets==5.14.3
     #   nbclient
     #   nbconvert
     #   nbformat
-transformers==4.53.0
-    # via
-    #   llama-index-llms-openai-like
-    #   sentence-transformers
+transformers==4.53.2
+    # via llama-index-llms-openai-like
 typer==0.16.0
     # via
     #   chromadb
     #   fastapi-cli
 types-requests==2.32.4.20250611
     # via cohere
-typing-extensions==4.14.0
+typing-extensions==4.14.1
     # via
+    #   aiosignal
     #   aiosqlite
     #   anyio
     #   beautifulsoup4
@@ -850,16 +840,13 @@ typing-extensions==4.14.0
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
     #   pinecone
-    #   posthog
     #   pydantic
     #   pydantic-core
     #   pyee
     #   pyopenssl
     #   referencing
     #   rich-toolkit
-    #   sentence-transformers
     #   sqlalchemy
-    #   torch
     #   typer
     #   typing-inspect
     #   typing-inspection
@@ -897,6 +884,8 @@ websockets==15.0.1
     # via
     #   google-genai
     #   uvicorn
+win32-setctime==1.2.0
+    # via loguru
 wrapt==1.17.2
     # via
     #   deprecated
