@@ -22,3 +22,6 @@ experiment_notebooks/
 .venv/
 .env
 .env.prod
+
+!frontend/
+!frontend/**
