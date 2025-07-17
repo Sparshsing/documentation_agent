@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import ThemeToggle from "./components/ThemeToggle";
+import Link from "next/link";
 
 interface Index {
   name: string;
@@ -260,6 +261,7 @@ export default function Home() {
             </ul>
           </section>
         )}
+        <Link href="/testpage">Test Page</Link>
       </main>
 
       <footer className="mt-12 text-xs text-center text-neutral-500">
