@@ -250,8 +250,8 @@ export default function Home() {
                         </div>
                       )}
                       <div className="prose dark:prose-invert max-w-none">
-                        <div className="markdown">
-                          <ReactMarkdown>{node.node_text}</ReactMarkdown>
+                        <div className="markdown whitespace-pre-line">
+                          {node.node_text}
                         </div>
                       </div>
                     </div>
