@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional, Any, Dict, Literal
+from datetime import datetime
 
 class RetrieveNodesRequest(BaseModel):
     query: str
@@ -40,3 +41,18 @@ class ErrorResponse(BaseModel):
     error: str
     message: str
     status_code: int
+
+class CreateIndexRequest(BaseModel):
+    index_name: str
+    description: str
+    source_url: str
+    source_type: Literal['documentation', 'api', 'github', 'website'] = 'documentation'
+    requester_name: Optional[str] = None
+    requester_email: Optional[str] = None
+    additional_notes: Optional[str] = None
+
+class CreateIndexResponse(BaseModel):
+    request_id: str
+    message: str
+    status: str
+    submitted_at: datetime

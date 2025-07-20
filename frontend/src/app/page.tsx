@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import ThemeToggle from "./components/ThemeToggle";
+import IndexRequestModal from "./components/IndexRequestModal";
 import Link from "next/link";
 
 interface Index {
@@ -37,6 +38,8 @@ export default function Home() {
   // Retrieval options
   const [mode, setMode] = useState<string>("hybrid"); // 'vector' | 'keyword' | 'hybrid'
   const [rerank, setRerank] = useState<boolean>(true);
+  // Index request modal
+  const [isIndexRequestModalOpen, setIsIndexRequestModalOpen] = useState<boolean>(false);
 
   const selectedIndexObj = indexes.find((idx) => idx.name === selectedIndex);
 
@@ -103,7 +106,15 @@ export default function Home() {
       {/* Header */}
       <header className="flex items-center justify-between max-w-4xl w-full mx-auto mb-8">
         <h1 className="text-2xl sm:text-3xl font-semibold">Documentation Agent</h1>
-        <ThemeToggle />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setIsIndexRequestModalOpen(true)}
+            className="bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+          >
+            Request Index
+          </button>
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Test div to verify dark mode */}
@@ -267,6 +278,12 @@ export default function Home() {
       <footer className="mt-12 text-xs text-center text-neutral-500">
         Powered by Documentation Agent
       </footer>
+
+      {/* Index Request Modal */}
+      <IndexRequestModal
+        isOpen={isIndexRequestModalOpen}
+        onClose={() => setIsIndexRequestModalOpen(false)}
+      />
     </div>
   );
 }

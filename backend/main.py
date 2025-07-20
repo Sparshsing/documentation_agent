@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent.absolute()))  # add project root to path
 from backend.routes import retriever
+from backend.config import settings
 
 # Create FastAPI app instance
 app = FastAPI(
@@ -14,12 +15,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Add CORS middleware
+# Add CORS middleware with restricted origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this for production
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

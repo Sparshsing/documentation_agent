@@ -1,7 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import JSONResponse
 import sys
 import os
+import uuid
+import csv
+from datetime import datetime
+from pathlib import Path
 from typing import List, Dict, Any
 
 # Add the project root to Python path
@@ -25,7 +29,9 @@ from backend.models.request_models import (
     QueryIndexRequest,
     QueryIndexResponse,
     ErrorResponse,
-    RetrievedNode
+    RetrievedNode,
+    CreateIndexRequest,
+    CreateIndexResponse
 )
 
 router = APIRouter()
@@ -96,6 +102,76 @@ async def api_query_index(request: QueryIndexRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error querying index: {str(e)}")
+
+@router.post("/request-index", response_model=CreateIndexResponse)
+async def request_index_creation(request: CreateIndexRequest, http_request: Request):
+    """
+    Submit a request for creating a new index
+    """
+    try:
+        # Generate unique request ID
+        request_id = str(uuid.uuid4())
+        timestamp = datetime.now()
+        
+        # Get client IP address
+        client_ip = http_request.client.host if http_request.client else "unknown"
+        # Check for forwarded IP in case of proxy
+        forwarded_for = http_request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            client_ip = forwarded_for.split(",")[0].strip()
+        
+        # Create request data
+        request_data = {
+            "request_id": request_id,
+            "index_name": request.index_name,
+            "description": request.description,
+            "source_url": request.source_url,
+            "source_type": request.source_type,
+            "requester_name": request.requester_name,
+            "requester_email": request.requester_email,
+            "additional_notes": request.additional_notes,
+            "client_ip": client_ip,
+            "submitted_at": timestamp.isoformat(),
+            "status": "pending"
+        }
+        
+        # Determine the processed data path
+        processed_data_path = os.environ.get('PROCESSED_DATA_PATH', 'processed_data')
+        requests_file = Path(processed_data_path) / "index_requests.csv"
+        
+        # Ensure the directory exists
+        requests_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Define CSV headers
+        csv_headers = [
+            "request_id", "index_name", "description", "source_url", "source_type",
+            "requester_name", "requester_email", "additional_notes", "client_ip",
+            "submitted_at", "status"
+        ]
+        
+        # Check if file exists to determine if we need to write headers
+        file_exists = requests_file.exists()
+        
+        # Append the request to the CSV file
+        with open(requests_file, 'a', newline='', encoding='utf-8') as f:
+            writer = csv.DictWriter(f, fieldnames=csv_headers)
+            
+            # Write headers if file is new
+            if not file_exists:
+                writer.writeheader()
+            
+            # Write the request data
+            writer.writerow(request_data)
+        
+        return CreateIndexResponse(
+            request_id=request_id,
+            message=f"Index creation request for '{request.index_name}' has been submitted successfully",
+            status="submitted",
+            submitted_at=timestamp
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error submitting index request: {str(e)}")
 
 @router.get("/indexes")
 async def get_available_indexes():
