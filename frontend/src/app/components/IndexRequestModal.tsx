@@ -57,7 +57,7 @@ export default function IndexRequestModal({ isOpen, onClose }: IndexRequestModal
         throw new Error(`Request failed: ${response.status}`);
       }
 
-      const result = await response.json();
+      // const result = await response.json();
       setSuccess(true);
       
       // Reset form after successful submission
@@ -127,7 +127,7 @@ export default function IndexRequestModal({ isOpen, onClose }: IndexRequestModal
                 Request Submitted!
               </h3>
               <p className="text-neutral-600 dark:text-neutral-400">
-                Your index creation request has been submitted successfully. We'll review it and get back to you soon.
+                Your index creation request has been submitted successfully. We&apos;ll review it and get back to you soon.
               </p>
             </div>
           ) : (
