@@ -8,6 +8,11 @@
 - LLM - It is configured to use free llms from gemini / cerebras / groq etc. Also Ollama can be used for local usage.
 - Embeddings - It can be used with google embeddings (free and recommended) or any open source embedding from huggingface using fastembed library (local)
 
+
+## Simple Example
+- Quickly understand about a simple RAG pipeline: ```notebooks/simple_rag.ipynb```
+
+
 ## Installation
 
 ### Prerequisites
