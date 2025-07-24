@@ -167,18 +167,21 @@ def initialize_langfuse():
 async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_graph=False, config=None):
     # modes: vector, keyword, hybrid (default)
     
+    if top_k > 20:
+        raise ValueError('Top k is too high. Please use a lower value.')
+    
     print('retrieve_nodes is runnig')
     print("current directory", os.getcwd())
     print("PROCESSED_DATA_PATH", PROCESSED_DATA_PATH)
 
     # check if we are able to write to files inside PROCESSED_DATA_PATH
-    test_file = Path(PROCESSED_DATA_PATH) / 'test.txt'
-    try:
-        with open(test_file, 'w') as f:
-            f.write('test')
-        print('test file written')
-    except Exception as e:
-        print(f"Error writing to test file: {e}")
+    # test_file = Path(PROCESSED_DATA_PATH) / 'test.txt'
+    # try:
+    #     with open(test_file, 'w') as f:
+    #         f.write('test')
+    #     print('test file written')
+    # except Exception as e:
+    #     print(f"Error writing to test file: {e}")
 
     # test_file_chromadb = Path(PROCESSED_DATA_PATH) / 'chromadb/test.txt'
     # try:
@@ -271,7 +274,7 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
         keyword_retriever = BM25Retriever.from_defaults(nodes=docstore_nodes, similarity_top_k=similarity_top_k, stemmer=Stemmer.Stemmer("english"), language="english")
         retriever = QueryFusionRetriever(
             retrievers=[vector_retriever, keyword_retriever],
-            num_queries=4,
+            num_queries=3,
             similarity_top_k = similarity_top_k,
             llm=llm,
             retriever_weights=[0.7, 0.3],

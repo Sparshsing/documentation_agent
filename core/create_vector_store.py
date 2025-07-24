@@ -67,7 +67,7 @@ OUTPUT_DIR = ROOT_OUTPUT_DIR + '/' + INDEX_NAME  # do not change this
 
 FILE_TYPES = ['.md', '.mdx']
 # Select Extractors - To add metadata to each node. Some of them may use many LLM calls. Use only if needed.
-METADATA_EXTRACTORS = ['CustomDocumentContextExtractor']  # choose from ['TitleExtractor', 'SummaryExtractor', 'KeywordExtractor', 'CustomDocumentContextExtractor' etc]
+METADATA_EXTRACTORS = []  # choose one or more from ['TitleExtractor', 'SummaryExtractor', 'KeywordExtractor', 'CustomDocumentContextExtractor' etc]
 
 CHROMADB_PATH = DEFAULT_CHROMADB_PATH  # change if you like
 CHROMADB_COLLECTION = INDEX_NAME
