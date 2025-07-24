@@ -4,6 +4,7 @@ import sys
 import os
 import uuid
 import csv
+import json
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
@@ -176,26 +177,27 @@ async def request_index_creation(request: CreateIndexRequest, http_request: Requ
 @router.get("/indexes")
 async def get_available_indexes():
     """
-    Get list of available indexes (hard-coded for now)
+    Get list of available indexes from a JSON file.
     """
-    # Hard-coded indexes based on your processed_data directory structure
-    available_indexes = [
-        {
-            "name": "google_genai-api",
-            "description": "Google Genai Gemini api documentation",
-            "source": "https://ai.google.dev/api"
-        },
-        {
-            "name": "google_genai-docs", 
-            "description": "Google Genai Gemini documentation",
-            "source": "https://ai.google.dev/gemini-api/docs"
-        },
-    ]
-    
-    return {
-        "indexes": available_indexes,
-        "count": len(available_indexes)
-    }
+    try:
+        processed_data_path = os.environ.get('PROCESSED_DATA_PATH', 'processed_data')
+        indexes_file = Path(processed_data_path) / "indexes.json"
+
+        if not indexes_file.exists():
+            return {"indexes": [], "count": 0, "message": "Indexes file not found."}
+
+        with open(indexes_file, 'r', encoding='utf-8') as f:
+            available_indexes = json.load(f)
+
+        return {
+            "indexes": available_indexes,
+            "count": len(available_indexes)
+        }
+    except Exception as e:
+        # Log the error for debugging purposes
+        print(f"Error reading indexes file: {e}")
+        raise HTTPException(status_code=500, detail="Could not load available indexes.")
+
 
 @router.get("/status")
 async def retriever_status():

@@ -46,7 +46,7 @@ class CreateIndexRequest(BaseModel):
     index_name: str
     description: str
     source_url: str
-    source_type: Literal['documentation', 'api', 'github', 'website'] = 'documentation'
+    source_type: Literal['github', 'website', 'other'] = 'documentation'
     requester_name: Optional[str] = None
     requester_email: Optional[str] = None
     additional_notes: Optional[str] = None

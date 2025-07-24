@@ -161,10 +161,9 @@ export default function IndexRequestModal({ isOpen, onClose }: IndexRequestModal
                     className="w-full p-3 rounded-md border border-neutral-300 dark:border-neutral-600 bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 text-sm"
                     required
                   >
-                    <option value="documentation">Documentation</option>
-                    <option value="api">API</option>
-                    <option value="github">GitHub</option>
                     <option value="website">Website</option>
+                    <option value="github">GitHub</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
               </div>
