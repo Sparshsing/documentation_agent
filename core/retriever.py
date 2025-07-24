@@ -167,9 +167,6 @@ def initialize_langfuse():
 async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_graph=False, config=None):
     # modes: vector, keyword, hybrid (default)
     
-    if top_k > 20:
-        raise ValueError('Top k is too high. Please use a lower value.')
-    
     print('retrieve_nodes is runnig')
     print("current directory", os.getcwd())
     print("PROCESSED_DATA_PATH", PROCESSED_DATA_PATH)
