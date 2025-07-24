@@ -45,7 +45,8 @@ export default function IndexRequestModal({ isOpen, onClose }: IndexRequestModal
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/request-index", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/api/v1/request-index`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -47,7 +47,8 @@ export default function Home() {
 
   // Fetch indexes on mount
   useEffect(() => {
-    fetch("http://localhost:8000/api/v1/indexes")
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    fetch(`${apiUrl}/api/v1/indexes`)
       .then((res) => res.json())
       .then((data) => {
         setIndexes(data.indexes ?? []);
@@ -69,7 +70,8 @@ export default function Home() {
     setSources(null);
 
     try {
-      const res = await fetch("http://localhost:8000/api/v1/query-index", {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const res = await fetch(`${apiUrl}/api/v1/query-index`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -105,7 +107,18 @@ export default function Home() {
     <div className="min-h-screen bg-white dark:bg-neutral-950 text-neutral-900 dark:text-neutral-100 transition-colors px-4 sm:px-8 py-10 flex flex-col">
       {/* Header */}
       <header className="flex items-center justify-between max-w-4xl w-full mx-auto mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold">Documentation Agent</h1>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-semibold">
+            Documentation Agent
+          </h1>
+          <Link
+            href="https://wisdomofcrowd.net/"
+            target="_blank"
+            className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            Wisdom Of Crowd
+          </Link>
+        </div>
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsIndexRequestModalOpen(true)}
@@ -272,7 +285,7 @@ export default function Home() {
             </ul>
           </section>
         )}
-        <Link href="/testpage">Test Page</Link>
+        {/* <Link href="/testpage">Test Page</Link> */}
       </main>
 
       <footer className="mt-12 text-xs text-center text-neutral-500">
