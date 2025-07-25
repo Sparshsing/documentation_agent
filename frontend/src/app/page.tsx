@@ -23,6 +23,7 @@ interface RetrievedNode {
 interface ApiResponse {
   response: string;
   sources: RetrievedNode[];
+  context_tokens: number;
 }
 
 export default function Home() {
@@ -31,10 +32,11 @@ export default function Home() {
   const [query, setQuery] = useState<string>("");
   const [responseText, setResponseText] = useState<string>("");
   const [sources, setSources] = useState<RetrievedNode[] | null>(null);
+  const [contextTokens, setContextTokens] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [includeSources, setIncludeSources] = useState<boolean>(true);
-  const [topK, setTopK] = useState<number>(5);
+  const [topK, setTopK] = useState<number>(10);
   // Retrieval options
   const [mode, setMode] = useState<string>("hybrid"); // 'vector' | 'keyword' | 'hybrid'
   const [rerank, setRerank] = useState<boolean>(true);
@@ -68,6 +70,7 @@ export default function Home() {
     setError(null);
     setResponseText("");
     setSources(null);
+    setContextTokens(0);
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -99,6 +102,7 @@ export default function Home() {
       const data: ApiResponse = await res.json();
       setResponseText(data.response);
       setSources(data.sources ?? null);
+      setContextTokens(data.context_tokens ?? 0);
     } catch (err) {
       console.error(err);
       if (err instanceof Error) {
@@ -254,6 +258,13 @@ export default function Home() {
               <ReactMarkdown>{responseText}</ReactMarkdown>
             </div>
           </section>
+        )}
+
+        {/* Context Tokens */}
+        {contextTokens > 0 && (
+          <div className="text-xs text-neutral-500 mt-2">
+            Context Tokens: {contextTokens}
+          </div>
         )}
 
         {/* Sources */}
