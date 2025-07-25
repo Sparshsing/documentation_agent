@@ -17,6 +17,15 @@ interface IndexRequestForm {
   additional_notes: string;
 }
 
+interface FastAPIValidationError {
+  loc: (string | number)[];
+  msg: string;
+  type: string;
+  ctx?: {
+    expected: string;
+  };
+}
+
 export default function IndexRequestModal({ isOpen, onClose }: IndexRequestModalProps) {
   const [formData, setFormData] = useState<IndexRequestForm>({
     index_name: "",
@@ -60,11 +69,11 @@ export default function IndexRequestModal({ isOpen, onClose }: IndexRequestModal
             if (typeof errorData.detail === 'string') {
                 throw new Error(errorData.detail);
             } else if (Array.isArray(errorData.detail)) {
-                const messages = errorData.detail.map((d: any) => {
+                const messages = errorData.detail.map((d: FastAPIValidationError) => {
                     const field = d.loc && d.loc.length > 1 ? `\`${d.loc[1]}\`` : 'field';
                     let message = d.msg;
                     // Make it more user-friendly
-                    if (d.type === 'literal_error') {
+                    if (d.type === 'literal_error' && d.ctx?.expected) {
                         message = `Invalid value for ${field}. Expected one of: ${d.ctx.expected}`;
                     } else {
                         message = `Error in ${field}: ${d.msg}`
