@@ -43,7 +43,7 @@ async def api_retrieve_nodes(request: RetrieveNodesRequest):
     Retrieve nodes based on query using your existing retrieve_nodes function
     """
     if request.top_k > 20:
-        raise HTTPException(status_code=400, detail='Top k is too high. Please use a lower value.')
+        raise HTTPException(status_code=400, detail='Top k is too high. Should not be greater than 20.')
     
     try:
         nodes = await retrieve_nodes(
@@ -78,7 +78,7 @@ async def api_query_index(request: QueryIndexRequest):
     Query the index using your existing query_index function
     """
     if request.top_k > 20:
-        raise HTTPException(status_code=400, detail='Top k is too high. Please use a lower value.')
+        raise HTTPException(status_code=400, detail='Top k is too high. Should not be greater than 20.')
     
     try:
         # Call your existing function

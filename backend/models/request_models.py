@@ -5,7 +5,7 @@ from datetime import datetime
 class RetrieveNodesRequest(BaseModel):
     query: str
     index: str
-    top_k: int = 5
+    top_k: int = 10
     mode: Literal['vector', 'keyword', 'hybrid'] = 'hybrid'
     rerank: bool = True
     use_graph: bool = False
@@ -24,7 +24,7 @@ class RetrieveNodesResponse(BaseModel):
 class QueryIndexRequest(BaseModel):
     query: str
     index: str
-    top_k: int = 5
+    top_k: int = 10
     mode: Literal['vector', 'keyword', 'hybrid'] = 'hybrid'
     rerank: bool = True
     use_graph: bool = False
@@ -46,7 +46,7 @@ class CreateIndexRequest(BaseModel):
     index_name: str
     description: str
     source_url: str
-    source_type: Literal['github', 'website', 'other'] = 'documentation'
+    source_type: Literal['website', 'github', 'other'] = 'website'
     requester_name: Optional[str] = None
     requester_email: Optional[str] = None
     additional_notes: Optional[str] = None
