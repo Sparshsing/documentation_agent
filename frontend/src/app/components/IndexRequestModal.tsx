@@ -11,7 +11,7 @@ interface IndexRequestForm {
   index_name: string;
   description: string;
   source_url: string;
-  source_type: "documentation" | "api" | "github" | "website";
+  source_type: "website" | "github" | "other" ;
   requester_name: string;
   requester_email: string;
   additional_notes: string;
@@ -22,7 +22,7 @@ export default function IndexRequestModal({ isOpen, onClose }: IndexRequestModal
     index_name: "",
     description: "",
     source_url: "",
-    source_type: "documentation",
+    source_type: "website",
     requester_name: "",
     requester_email: "",
     additional_notes: "",
@@ -55,7 +55,26 @@ export default function IndexRequestModal({ isOpen, onClose }: IndexRequestModal
       });
 
       if (!response.ok) {
-        throw new Error(`Request failed: ${response.status}`);
+        const errorData = await response.json();
+        if (errorData && errorData.detail) {
+            if (typeof errorData.detail === 'string') {
+                throw new Error(errorData.detail);
+            } else if (Array.isArray(errorData.detail)) {
+                const messages = errorData.detail.map((d: any) => {
+                    const field = d.loc && d.loc.length > 1 ? `\`${d.loc[1]}\`` : 'field';
+                    let message = d.msg;
+                    // Make it more user-friendly
+                    if (d.type === 'literal_error') {
+                        message = `Invalid value for ${field}. Expected one of: ${d.ctx.expected}`;
+                    } else {
+                        message = `Error in ${field}: ${d.msg}`
+                    }
+                    return message;
+                }).join('; ');
+                throw new Error(messages);
+            }
+        }
+        throw new Error(`Request failed with status: ${response.status}`);
       }
 
       // const result = await response.json();
@@ -79,7 +98,7 @@ export default function IndexRequestModal({ isOpen, onClose }: IndexRequestModal
       index_name: "",
       description: "",
       source_url: "",
-      source_type: "documentation",
+      source_type: "website",
       requester_name: "",
       requester_email: "",
       additional_notes: "",

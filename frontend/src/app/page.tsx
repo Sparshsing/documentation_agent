@@ -86,7 +86,15 @@ export default function Home() {
         }),
       });
 
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
+      if (!res.ok) {
+        const errorData = await res.json();
+        if (errorData && errorData.detail) {
+          if (typeof errorData.detail === 'string') {
+            throw new Error(errorData.detail);
+          }
+        }
+        throw new Error(`API error: ${res.status}`);
+      }
 
       const data: ApiResponse = await res.json();
       setResponseText(data.response);
