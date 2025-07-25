@@ -70,20 +70,16 @@ def verify_config(config):
     Verifies that the crucial fields in the config are present.
     """
     fields_to_verify = [
-        'index_name', 'input_dir', 'output_dir', 'vector_store', 
-        'chromadb_path', 'chroma_collection', 'docstore_path', 
+        'index_name', 'vector_store', 
+        'chroma_collection', 'docstore_path', 
         'embedding_provider', 'embedding_model', 'tokenizer_provider', 
-        'tokenizer_model_name', 'metadata_extractors', 'runs'
+        'tokenizer_model_name'
     ]
     
     for field in fields_to_verify:
         if field not in config:
             print(f"Field '{field}' not found in config")
             return False
-            
-    if not isinstance(config['runs'], list):
-        print("Field 'runs' is not a list.")
-        return False
 
     return True
 
@@ -96,9 +92,6 @@ def get_config(index):
 
     with open(config_file, 'r') as f:
         config = json.load(f)
-    
-    if not verify_config(config):
-        raise ValueError("Config is not valid")
     
     return config
 
@@ -193,6 +186,8 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
 
     if config is None:
         config = get_config(index)
+    if not verify_config(config):
+        raise ValueError("Config is not valid")
     
     llm = get_llm(llm_model_provider=LLM_MODEL_PROVIDER, llm_model=LLM_MODEL)
     Settings.llm = llm
@@ -261,12 +256,12 @@ async def retrieve_nodes(query, index, top_k=5, mode='hybrid', rerank=True, use_
     if mode == 'vector':
         retriever = vector_index.as_retriever(similarity_top_k=similarity_top_k)
     elif mode == 'keyword':
-        loaded_docstore =SimpleDocumentStore.from_persist_path(config['docstore_path'])
+        loaded_docstore = SimpleDocumentStore.from_persist_path(config['docstore_path'])
         docstore_nodes = list(loaded_docstore.docs.values())
         retriever = BM25Retriever.from_defaults(nodes=docstore_nodes, similarity_top_k=similarity_top_k, stemmer=Stemmer.Stemmer("english"), language="english")
     elif mode == 'hybrid':
         vector_retriever = vector_index.as_retriever(similarity_top_k=similarity_top_k)
-        loaded_docstore =SimpleDocumentStore.from_persist_path(config['docstore_path'])
+        loaded_docstore = SimpleDocumentStore.from_persist_path(config['docstore_path'])
         docstore_nodes = list(loaded_docstore.docs.values())
         keyword_retriever = BM25Retriever.from_defaults(nodes=docstore_nodes, similarity_top_k=similarity_top_k, stemmer=Stemmer.Stemmer("english"), language="english")
         retriever = QueryFusionRetriever(
@@ -322,6 +317,8 @@ async def query_index(query, index, top_k=5, mode='hybrid', rerank=True, use_gra
     
     if config is None:
         config = get_config(index)
+    if not verify_config(config):
+        raise ValueError("Config is not valid")
     
     retieved_nodes = await retrieve_nodes(query, index, top_k=top_k, mode=mode, rerank=rerank, use_graph=use_graph, config=config)
 
